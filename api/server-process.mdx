@@ -1,0 +1,60 @@
+---
+title: "ServerProcess"
+description: "The internal container for all server subsystems, accessible via MinecraftServer.process()."
+---
+
+`ServerProcess` is the object that owns every manager and registry instance. It is created by `MinecraftServer.init()` and available via `MinecraftServer.process()`.
+
+Most applications access managers through the static `MinecraftServer` methods (e.g., `MinecraftServer.getInstanceManager()`), which delegate to `ServerProcess` internally. Use `process()` directly when you need to pass the entire server context to a subsystem or when writing extensions.
+
+## Accessing the process
+
+```java
+ServerProcess process = MinecraftServer.process();
+```
+
+## Available accessors
+
+| Method | Returns |
+|---|---|
+| `process.eventHandler()` | `GlobalEventHandler` |
+| `process.instance()` | `InstanceManager` |
+| `process.command()` | `CommandManager` |
+| `process.connection()` | `ConnectionManager` |
+| `process.scheduler()` | `SchedulerManager` |
+| `process.block()` | `BlockManager` |
+| `process.recipe()` | `RecipeManager` |
+| `process.team()` | `TeamManager` |
+| `process.advancement()` | `AdvancementManager` |
+| `process.bossBar()` | `BossBarManager` |
+| `process.exception()` | `ExceptionManager` |
+| `process.benchmark()` | `BenchmarkManager` |
+| `process.packetListener()` | `PacketListenerManager` |
+| `process.dimensionType()` | `DynamicRegistry<DimensionType>` |
+| `process.biome()` | `DynamicRegistry<Biome>` |
+| `process.enchantment()` | `DynamicRegistry<Enchantment>` |
+| `process.server()` | `Server` (the NIO socket server) |
+| `process.dispatcher()` | `ThreadDispatcher` |
+
+## Lifecycle
+
+```java
+// Check whether the server is running
+boolean alive = MinecraftServer.process().isAlive();
+
+// Start (called internally by MinecraftServer.start())
+process.start(new InetSocketAddress("0.0.0.0", 25565));
+
+// Stop
+process.stop();
+```
+
+## Exception handling
+
+Override the default exception handler (which logs to SLF4J) to integrate with your error reporting:
+
+```java
+MinecraftServer.getExceptionManager().setExceptionHandler(e -> {
+    myErrorTracker.report(e);
+});
+```

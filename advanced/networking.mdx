@@ -1,0 +1,104 @@
+---
+title: "Networking"
+description: "Work with Minestom's NIO networking layer, send custom packets, and listen to low-level packet events."
+---
+
+Minestom's networking stack is built on Java NIO. Every player connection is a `PlayerConnection` backed by a non-blocking socket channel. You generally don't need to interact with the network layer directly, but the APIs are public for advanced use cases.
+
+## Sending packets to players
+
+Players expose `sendPacket()` for any `ServerPacket`:
+
+```java
+// Send a custom plugin message
+player.sendPacket(new PluginMessagePacket("mygame:channel", data));
+
+// Send a particle effect
+player.sendPacket(new ParticlePacket(...));
+```
+
+Broadcast a packet to all online players:
+
+```java
+PacketSendingUtils.broadcastPlayPacket(new ServerDifficultyPacket(Difficulty.HARD, true));
+```
+
+## Listening to packets
+
+Register a listener for any incoming client packet via `PacketListenerManager`:
+
+```java
+MinecraftServer.getPacketListenerManager().setListener(
+    ClientChatMessagePacket.class,
+    (packet, player) -> {
+        System.out.println(player.getUsername() + " said: " + packet.message());
+    }
+);
+```
+
+<Warning>
+Packet listeners run on the network thread. Do not access entity/instance state directly — use the `Acquirable` API or schedule a task on the tick thread.
+</Warning>
+
+## Player connection info
+
+Access connection details from the `PlayerConnection`:
+
+```java
+PlayerConnection conn = player.getPlayerConnection();
+String address = conn.getRemoteAddress().toString();
+int protocol = conn.getProtocolVersion();
+```
+
+## Plugin channels
+
+Send and receive plugin messages (custom packets via `minecraft:brand` / custom namespaced channels):
+
+```java
+// Send a plugin message
+player.sendPacket(new PluginMessagePacket("mygame:info", myData));
+
+// Listen for incoming plugin messages
+MinecraftServer.getPacketListenerManager().setListener(
+    ClientPluginMessagePacket.class,
+    (packet, player) -> {
+        if ("mygame:info".equals(packet.channel())) {
+            handleCustomData(packet.data(), player);
+        }
+    }
+);
+```
+
+## Binding address
+
+Minestom can bind to a TCP port or a Unix domain socket:
+
+```java
+// Standard TCP
+minecraftServer.start("0.0.0.0", 25565);
+
+// Specific interface
+minecraftServer.start("127.0.0.1", 25565);
+
+// Unix domain socket
+minecraftServer.start(UnixDomainSocketAddress.of("minestom.sock"));
+```
+
+## Connection state
+
+A player's `ConnectionState` progresses through `HANDSHAKE → STATUS → LOGIN → CONFIGURATION → PLAY`. Most game logic fires once the player is in `PLAY`.
+
+## Server list ping
+
+Customize the server status shown in the Minecraft client's server list:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(ServerListPingEvent.class, event -> {
+    event.setStatus(Status.builder()
+        .description(Component.text("My Minestom Server"))
+        .playerInfo(Status.PlayerInfo.builder(Status.PlayerInfo.online(100))
+            .sample("Player 1", "Player 2")
+            .build())
+        .build());
+});
+```

@@ -1,0 +1,63 @@
+---
+title: "CommandManager"
+description: "Register commands and configure the unknown command callback."
+---
+
+`CommandManager` is the registry for all server commands. Obtain it with `MinecraftServer.getCommandManager()`.
+
+## Registering commands
+
+```java
+CommandManager cm = MinecraftServer.getCommandManager();
+cm.register(new MyCommand());
+```
+
+All registered commands are sent to the Minecraft client as part of the Commands packet — clients display them in tab-completion automatically.
+
+## Unregistering commands
+
+```java
+cm.unregister(myCommandInstance);
+```
+
+## Unknown command callback
+
+Called when a player or console sends a command that matches no registered command:
+
+```java
+cm.setUnknownCommandCallback((sender, commandString) ->
+    sender.sendMessage(Component.text("Unknown command: /" + commandString)
+        .color(NamedTextColor.RED))
+);
+```
+
+## Console input
+
+Dispatch a command string programmatically from the console sender:
+
+```java
+cm.execute(cm.getConsoleSender(), "gamemode creative Notch");
+```
+
+## Retrieving registered commands
+
+```java
+Collection<Command> all = cm.getCommands();
+Command cmd = cm.getCommand("health"); // null if not found
+```
+
+## Command structure recap
+
+Commands are built by extending `Command`:
+
+```java
+public class StopCommand extends Command {
+    public StopCommand() {
+        super("stop");
+        setCondition((sender, cmd) -> !(sender instanceof Player)); // console only
+        setDefaultExecutor((sender, ctx) -> MinecraftServer.stopCleanly());
+    }
+}
+```
+
+See the [Commands guide](/guides/commands) for the full argument and syntax API.

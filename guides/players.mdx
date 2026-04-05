@@ -1,0 +1,155 @@
+---
+title: "Players"
+description: "Handle player connections, spawning, game modes, teleportation, and messaging in Minestom."
+---
+
+## Player spawning flow
+
+Minestom does not place players in a world automatically. You must assign a spawning instance in `AsyncPlayerConfigurationEvent`, which fires on the network thread before the player enters the play state:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent.class, event -> {
+    Player player = event.getPlayer();
+    event.setSpawningInstance(myInstance);
+    player.setRespawnPoint(new Pos(0, 40, 0));
+});
+```
+
+<Warning>
+If you do not call `event.setSpawningInstance()`, the player is kicked immediately with a connection error.
+</Warning>
+
+Once the player has spawned, `PlayerSpawnEvent` fires on the tick thread:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent.class, event -> {
+    Player player = event.getPlayer();
+    player.setGameMode(GameMode.SURVIVAL);
+    if (event.isFirstSpawn()) {
+        player.sendMessage(Component.text("Welcome to the server!"));
+    }
+});
+```
+
+## Game modes
+
+```java
+player.setGameMode(GameMode.CREATIVE);
+player.setGameMode(GameMode.SURVIVAL);
+player.setGameMode(GameMode.ADVENTURE);
+player.setGameMode(GameMode.SPECTATOR);
+
+GameMode current = player.getGameMode();
+```
+
+## Teleportation
+
+```java
+// Teleport to coordinates
+player.teleport(new Pos(100, 64, 200));
+
+// Teleport with yaw/pitch
+player.teleport(new Pos(100, 64, 200, 90f, 0f));
+
+// Teleport to another player's position
+player.teleport(target.getPosition());
+```
+
+`teleport()` returns a `CompletableFuture<Void>` that completes when the chunk at the destination is loaded.
+
+## Sending messages and UI
+
+Minestom uses the [Adventure](https://docs.advntr.dev/) library for all text. Adventure `Component` objects are passed wherever text is needed:
+
+```java
+// Chat message
+player.sendMessage(Component.text("Hello!").color(NamedTextColor.GREEN));
+
+// Action bar (above hotbar)
+player.sendActionBar(Component.text("10 kills remaining"));
+
+// Title and subtitle
+player.showTitle(Title.title(
+    Component.text("Round Over"),
+    Component.text("You scored 5 points"),
+    Title.Times.times(
+        Duration.ofMillis(500),
+        Duration.ofSeconds(3),
+        Duration.ofMillis(500)
+    )
+));
+
+// Clear title
+player.clearTitle();
+```
+
+## Boss bars
+
+```java
+BossBar bar = BossBar.bossBar(
+    Component.text("Boss HP"),
+    0.8f,               // progress 0.0-1.0
+    BossBar.Color.RED,
+    BossBar.Overlay.PROGRESS
+);
+
+player.showBossBar(bar);
+player.hideBossBar(bar);
+
+// Update progress
+bar.progress(0.4f);
+```
+
+## Sounds
+
+```java
+player.playSound(Sound.sound(
+    SoundEvent.ENTITY_EXPERIENCE_ORB_PICKUP,
+    Sound.Source.PLAYER,
+    1.0f,  // volume
+    1.0f   // pitch
+));
+```
+
+## Health and food
+
+```java
+player.setHealth(20f);   // max default health
+float hp = player.getHealth();
+
+player.setFood(20);
+player.setFoodSaturation(5f);
+```
+
+## Permission level
+
+```java
+player.setPermissionLevel(4); // op level (0-4)
+int level = player.getPermissionLevel();
+```
+
+## Kicking players
+
+```java
+player.kick(Component.text("You have been banned.").color(NamedTextColor.RED));
+```
+
+## Player disconnect event
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(PlayerDisconnectEvent.class, event -> {
+    System.out.println(event.getPlayer().getUsername() + " disconnected");
+});
+```
+
+## Resource packs
+
+```java
+player.sendResourcePacks(ResourcePackRequest.resourcePackRequest()
+    .packs(ResourcePackInfo.resourcePackInfo(
+        UUID.randomUUID(),
+        URI.create("https://example.com/pack.zip"),
+        "abc123sha1hash"
+    ))
+    .build());
+```

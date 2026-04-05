@@ -1,80 +1,188 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick start"
+description: "Get a Minestom server running with a working player spawn in about five minutes."
 ---
 
-## Get started in three steps
+This guide walks you through building a minimal Minestom server: one that accepts connections, places players in a world, and starts ticking. All code is derived from the [demo application](https://github.com/minestom/minestom/tree/main/demo/src/main/java/net/minestom/demo).
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+- Java 21 or later
+- Gradle or Maven (this guide uses Gradle Kotlin DSL)
+- Minestom added as a dependency — see [Installation](/installation) if you haven't done this yet
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+---
 
-### Step 2: Deploy your changes
+<Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Step title="Add the dependency">
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Add Minestom to your `build.gradle.kts`. Replace `VERSION` with the latest release from the [GitHub releases page](https://github.com/minestom/minestom/releases).
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```kotlin
+repositories {
+    mavenCentral()
+}
 
-### Step 3: Go live
+dependencies {
+    implementation("net.minestom:minestom:VERSION")
+}
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+See [Installation](/installation) for full setup instructions including Maven and the Java module system.
+
+</Step>
+
+<Step title="Initialize the server">
+
+Call `MinecraftServer.init()` before registering any game logic. This bootstraps all internal managers and registries.
+
+```java
+import net.minestom.server.MinecraftServer;
+import net.minestom.server.Auth;
+
+public class Main {
+    public static void main(String[] args) {
+        MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Offline());
+        
+        // Register your game logic here (instances, events, commands)
+
+        minecraftServer.start("0.0.0.0", 25565);
+    }
+}
+```
+
+<Note>
+  `MinecraftServer.init()` must be called before accessing any manager (e.g., `MinecraftServer.getInstanceManager()`). Calling managers before `init()` will throw a `NullPointerException` because the internal `ServerProcess` has not been created yet.
+
+  Passing `new Auth.Offline()` disables online-mode authentication. Players can connect without a valid Mojang account. Use `Auth.Online()` (or configure Velocity/BungeeCord proxy auth) for production.
+</Note>
+
+</Step>
+
+<Step title="Create an instance">
+
+An instance is Minestom's equivalent of a world. You must create at least one before players can join. Use `InstanceManager` to create an `InstanceContainer`, then assign a generator to define the terrain.
+
+```java
+import net.minestom.server.instance.InstanceContainer;
+import net.minestom.server.instance.InstanceManager;
+import net.minestom.server.instance.LightingChunk;
+import net.minestom.server.instance.block.Block;
+
+InstanceManager instanceManager = MinecraftServer.getInstanceManager();
+
+InstanceContainer instanceContainer = instanceManager.createInstanceContainer();
+instanceContainer.setGenerator(unit -> {
+    unit.modifier().fillHeight(0, 40, Block.STONE);
+});
+instanceContainer.setChunkSupplier(LightingChunk::new);
+```
+
+`setGenerator` is called for each chunk as it is loaded. The example fills blocks from y=0 to y=40 with stone, producing a flat surface at y=40. `LightingChunk` enables proper block lighting calculations.
+
+</Step>
+
+<Step title="Handle player join">
+
+Listen for `AsyncPlayerConfigurationEvent` to assign a spawning instance to each connecting player, and `PlayerSpawnEvent` to set their initial game mode and spawn position.
+
+```java
+import net.minestom.server.coordinate.Pos;
+import net.minestom.server.entity.GameMode;
+import net.minestom.server.event.GlobalEventHandler;
+import net.minestom.server.event.player.AsyncPlayerConfigurationEvent;
+import net.minestom.server.event.player.PlayerSpawnEvent;
+
+GlobalEventHandler eventHandler = MinecraftServer.getGlobalEventHandler();
+
+eventHandler.addListener(AsyncPlayerConfigurationEvent.class, event -> {
+    event.setSpawningInstance(instanceContainer);
+    event.getPlayer().setRespawnPoint(new Pos(0, 40f, 0));
+});
+
+eventHandler.addListener(PlayerSpawnEvent.class, event -> {
+    event.getPlayer().setGameMode(GameMode.CREATIVE);
+});
+```
+
+<Warning>
+  Every player **must** be assigned a spawning instance in `AsyncPlayerConfigurationEvent`. If `setSpawningInstance` is not called, the player will be kicked immediately after the configuration phase with a connection error.
+</Warning>
+
+</Step>
+
+<Step title="Start the server">
+
+With instances and events registered, call `start()` to begin accepting connections.
+
+```java
+minecraftServer.start("0.0.0.0", 25565);
+```
+
+`start()` blocks the calling thread and begins the tick loop. The server is now reachable at `localhost:25565`.
+
+</Step>
+
+</Steps>
+
+## Complete example
+
+Putting the above together into a single `Main.java`:
+
+```java
+import net.minestom.server.Auth;
+import net.minestom.server.MinecraftServer;
+import net.minestom.server.coordinate.Pos;
+import net.minestom.server.entity.GameMode;
+import net.minestom.server.event.GlobalEventHandler;
+import net.minestom.server.event.player.AsyncPlayerConfigurationEvent;
+import net.minestom.server.event.player.PlayerSpawnEvent;
+import net.minestom.server.instance.InstanceContainer;
+import net.minestom.server.instance.InstanceManager;
+import net.minestom.server.instance.LightingChunk;
+import net.minestom.server.instance.block.Block;
+
+public class Main {
+    public static void main(String[] args) {
+        MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Offline());
+
+        InstanceManager instanceManager = MinecraftServer.getInstanceManager();
+        InstanceContainer instanceContainer = instanceManager.createInstanceContainer();
+        instanceContainer.setGenerator(unit -> {
+            unit.modifier().fillHeight(0, 40, Block.STONE);
+        });
+        instanceContainer.setChunkSupplier(LightingChunk::new);
+
+        GlobalEventHandler eventHandler = MinecraftServer.getGlobalEventHandler();
+
+        eventHandler.addListener(AsyncPlayerConfigurationEvent.class, event -> {
+            event.setSpawningInstance(instanceContainer);
+            event.getPlayer().setRespawnPoint(new Pos(0, 40f, 0));
+        });
+
+        eventHandler.addListener(PlayerSpawnEvent.class, event -> {
+            event.getPlayer().setGameMode(GameMode.CREATIVE);
+        });
+
+        minecraftServer.start("0.0.0.0", 25565);
+    }
+}
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Installation" icon="download" href="/installation">
+    Full dependency setup for Gradle and Maven.
+  </Card>
+  <Card title="Instances" icon="earth-americas" href="/concepts/instances">
+    Learn how to create multiple instances and move players between them.
+  </Card>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    Scope and compose event listeners with EventNode.
+  </Card>
+  <Card title="Commands" icon="terminal" href="/guides/commands">
+    Register server commands with argument parsing and tab-completion.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

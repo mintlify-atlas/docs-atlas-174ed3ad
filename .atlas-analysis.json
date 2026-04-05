@@ -1,0 +1,137 @@
+{
+  "projectType": "framework",
+  "projectName": "Minestom",
+  "projectDescription": "A lightweight, high-performance Minecraft server framework for Java that gives developers full control to build custom game experiences.",
+  "theme": "aspen",
+  "primaryColor": "#f76e61",
+  "lightColor": "#fb75a4",
+  "darkColor": "#a04d69",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/instances",
+              "concepts/entities",
+              "concepts/events",
+              "concepts/threading"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/commands",
+              "guides/world-generation",
+              "guides/blocks",
+              "guides/items-inventory",
+              "guides/players",
+              "guides/scheduling"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/configuration",
+              "advanced/authentication",
+              "advanced/networking",
+              "advanced/tags-nbt",
+              "advanced/performance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Server",
+            "pages": [
+              "api/minecraft-server",
+              "api/server-flags",
+              "api/server-process"
+            ]
+          },
+          {
+            "group": "Managers",
+            "pages": [
+              "api/instance-manager",
+              "api/command-manager",
+              "api/connection-manager",
+              "api/scheduler-manager"
+            ]
+          },
+          {
+            "group": "Registries",
+            "pages": [
+              "api/dynamic-registry",
+              "api/block-registry",
+              "api/entity-types"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Zero world generation by default — full developer control over game world",
+    "Multi-threaded tick system using ThreadDispatcher and TickThread",
+    "Hierarchical event system with filterable EventNode trees",
+    "Command framework with type-safe arguments and tab-completion",
+    "Dynamic registries for dimensions, biomes, enchantments, and more",
+    "NIO-based networking with packet-level access",
+    "Acquirable API for safe cross-thread entity access",
+    "Adventure library integration for rich text and audio",
+    "Built-in pathfinding with AI goal/target selectors",
+    "Anvil world format support and procedural chunk generation API"
+  ],
+  "publicApiSurface": [
+    "MinecraftServer.init()",
+    "MinecraftServer.start(String, int)",
+    "MinecraftServer.getGlobalEventHandler()",
+    "MinecraftServer.getInstanceManager()",
+    "MinecraftServer.getCommandManager()",
+    "MinecraftServer.getConnectionManager()",
+    "MinecraftServer.getSchedulerManager()",
+    "MinecraftServer.getBlockManager()",
+    "MinecraftServer.getBiomeRegistry()",
+    "MinecraftServer.getDimensionTypeRegistry()",
+    "EventNode.all(String)",
+    "EventNode.type(String, EventFilter)",
+    "EventNode.event(String, EventFilter, Predicate)",
+    "EventListener.builder(Class)",
+    "Instance (abstract)",
+    "InstanceContainer",
+    "SharedInstance",
+    "Entity",
+    "LivingEntity",
+    "Player",
+    "EntityCreature",
+    "Command (builder)",
+    "CommandManager.register(Command)",
+    "Generator (functional interface for world generation)",
+    "GenerationUnit",
+    "Block",
+    "BlockHandler",
+    "ItemStack",
+    "ItemStack.builder(Material)",
+    "ThreadDispatcher.dispatcher(ThreadProvider, int)",
+    "Acquirable",
+    "Tag",
+    "TagHandler",
+    "ServerFlag",
+    "DynamicRegistry",
+    "Auth.Offline",
+    "Auth (interface)"
+  ]
+}

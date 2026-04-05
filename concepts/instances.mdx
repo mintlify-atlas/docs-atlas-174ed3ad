@@ -1,0 +1,172 @@
+---
+title: "Instances"
+description: "Instances are Minestom's equivalent of worlds. Each instance owns its own chunk data, entity set, and event scope."
+---
+
+An `Instance` is the core container for a Minestom world. It holds chunks, tracks entities, and runs a per-tick scheduler. Players are always inside exactly one instance at a time, and entities can be moved between instances by calling `setInstance`.
+
+## Instance types
+
+Minestom provides two concrete implementations of `Instance`.
+
+<CardGroup cols={2}>
+  <Card title="InstanceContainer" icon="box">
+    Owns its chunk data. This is the standard type you create for a new world.
+  </Card>
+  <Card title="SharedInstance" icon="share-nodes">
+    Delegates all chunk operations to a parent `InstanceContainer`. Useful for running multiple separate entity sets over the same terrain.
+  </Card>
+</CardGroup>
+
+### InstanceContainer
+
+`InstanceContainer` stores the actual chunk map and is responsible for loading, generating, and unloading chunks. When you call `setBlock`, `loadChunk`, or `setGenerator`, you are working with an `InstanceContainer`.
+
+### SharedInstance
+
+A `SharedInstance` references an existing `InstanceContainer` for all block/chunk access but maintains its own entity tracker. Two `SharedInstance`s backed by the same container see identical terrain but have separate entity populations — useful for arena or minigame servers that need isolated player groups on a shared map.
+
+```java
+InstanceContainer container = instanceManager.createInstanceContainer();
+SharedInstance arena1 = instanceManager.createSharedInstance(container);
+SharedInstance arena2 = instanceManager.createSharedInstance(container);
+// arena1 and arena2 share chunks but have independent entity lists
+```
+
+## Creating an instance
+
+<Steps>
+
+<Step title="Get the InstanceManager">
+
+`InstanceManager` is available from `MinecraftServer` after `init()` has been called.
+
+```java
+InstanceManager instanceManager = MinecraftServer.getInstanceManager();
+```
+
+</Step>
+
+<Step title="Create an InstanceContainer">
+
+The no-argument overload defaults to the `OVERWORLD` dimension.
+
+```java
+InstanceContainer instance = instanceManager.createInstanceContainer();
+```
+
+To use a custom dimension type, pass a `RegistryKey<DimensionType>` obtained from the registry:
+
+```java
+DynamicRegistry<DimensionType> dimRegistry = MinecraftServer.getDimensionTypeRegistry();
+RegistryKey<DimensionType> netherKey = dimRegistry.getKey(Key.key("minecraft:the_nether"));
+InstanceContainer nether = instanceManager.createInstanceContainer(netherKey);
+```
+
+`createInstanceContainer` automatically registers the instance, so you do not need to call `registerInstance` separately.
+
+</Step>
+
+<Step title="Attach a generator">
+
+Without a generator, chunks load as empty void. Supply a `Generator` to define terrain:
+
+```java
+instance.setGenerator(unit -> {
+    unit.modifier().fillHeight(0, 40, Block.STONE);
+});
+```
+
+The generator receives a `GenerationUnit` for each chunk column as it is demanded. You can mix `fillHeight`, `setBlock`, and fork operations inside the same generator.
+
+</Step>
+
+<Step title="(Optional) Enable lighting">
+
+Replace the default chunk supplier with `LightingChunk` to get proper block-light calculations:
+
+```java
+instance.setChunkSupplier(LightingChunk::new);
+```
+
+</Step>
+
+</Steps>
+
+## Putting a player in an instance
+
+Players are placed into an instance during the configuration phase, before they fully join. Listen for `AsyncPlayerConfigurationEvent` and call `setSpawningInstance`:
+
+```java
+GlobalEventHandler eventHandler = MinecraftServer.getGlobalEventHandler();
+
+eventHandler.addListener(AsyncPlayerConfigurationEvent.class, event -> {
+    event.setSpawningInstance(instance);
+    event.getPlayer().setRespawnPoint(new Pos(0, 40, 0));
+});
+```
+
+<Warning>
+  Every player **must** receive a spawning instance in `AsyncPlayerConfigurationEvent`. If `setSpawningInstance` is never called, the player is kicked immediately after the configuration phase.
+</Warning>
+
+You can also move a player to a different instance at runtime with `setInstance`:
+
+```java
+player.setInstance(otherInstance, new Pos(0, 64, 0));
+```
+
+## Chunk loading
+
+By default, `InstanceContainer` has auto-chunk loading enabled (`autoChunkLoad = true`). This means that any operation requiring a chunk — including entity teleportation — will trigger a load if the chunk is not already in memory.
+
+You can force-load a specific chunk ahead of time and await completion:
+
+```java
+instance.loadChunk(chunkX, chunkZ).thenRun(() -> {
+    System.out.println("Chunk is loaded");
+});
+```
+
+To load only if auto-load is enabled (and return null otherwise):
+
+```java
+instance.loadOptionalChunk(chunkX, chunkZ);
+```
+
+To disable automatic loading:
+
+```java
+instance.enableAutoChunkLoad(false);
+```
+
+<Note>
+  When an `InstanceContainer` is unregistered via `instanceManager.unregisterInstance(instance)`, all its chunks are unloaded and all non-player entities in those chunks are removed. Players must be moved out of the instance first; calling `unregisterInstance` with online players throws an `IllegalStateException`.
+</Note>
+
+## Registering and unregistering
+
+Instances created through `createInstanceContainer` or `createSharedInstance` are registered automatically. If you instantiate an `InstanceContainer` manually, you must register it yourself:
+
+```java
+InstanceContainer custom = new InstanceContainer(UUID.randomUUID(), DimensionType.OVERWORLD);
+instanceManager.registerInstance(custom);
+```
+
+To remove an instance from the server when it is no longer needed:
+
+```java
+instanceManager.unregisterInstance(instance);
+```
+
+## Instance-scoped events
+
+Every registered instance has its own `EventNode<InstanceEvent>` that fires only for events originating within that instance. Add listeners directly to the node to avoid processing events from other instances:
+
+```java
+instance.eventNode().addListener(PlayerBlockBreakEvent.class, event -> {
+    System.out.println(event.getPlayer().getUsername() + " broke a block");
+});
+```
+
+See [Event system](/concepts/events) for more on how scoped nodes fit into the global event tree.

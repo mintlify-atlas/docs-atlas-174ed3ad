@@ -1,0 +1,167 @@
+---
+title: "World generation"
+description: "Implement the Generator interface to procedurally fill chunks, or load existing Minecraft worlds from disk with AnvilLoader."
+---
+
+Minestom generates terrain through the `Generator` functional interface. When a chunk is needed, the server calls `generate(GenerationUnit unit)` and your implementation fills it with blocks and biomes. The unit covers a full chunk column (16×world-height×16 blocks), divided into 16-block sections.
+
+## Implementing a generator
+
+`Generator` is a `@FunctionalInterface`, so a lambda is enough for most cases:
+
+```java
+Generator flatWorld = unit -> {
+    unit.modifier().fillHeight(0, 40, Block.STONE);
+    unit.modifier().fillHeight(38, 40, Block.DIRT);
+    unit.modifier().fillHeight(40, 41, Block.GRASS_BLOCK);
+};
+```
+
+### Attaching a generator to an instance
+
+```java
+InstanceContainer instance = MinecraftServer.getInstanceManager().createInstanceContainer();
+instance.setGenerator(flatWorld);
+```
+
+The generator is called lazily: blocks are produced only when the chunk is first loaded.
+
+## GenerationUnit
+
+`GenerationUnit` represents the area being generated. The key members are:
+
+| Method | Description |
+|---|---|
+| `modifier()` | Returns the `UnitModifier` used to place blocks and biomes |
+| `absoluteStart()` | Minimum (x, y, z) of the unit in world coordinates |
+| `absoluteEnd()` | Maximum (x, y, z) of the unit in world coordinates |
+| `size()` | Dimensions of the unit — always a multiple of 16 |
+| `subdivide()` | Splits into the smallest independent units (individual sections) |
+| `fork(start, end)` | Creates a sub-unit for deferred cross-chunk modifications |
+
+## UnitModifier
+
+`UnitModifier` extends `Block.Setter` and `Biome.Setter`. It provides bulk fill operations optimised for generation:
+
+| Method | Description |
+|---|---|
+| `setBlock(x, y, z, block)` | Place a single block at an absolute position |
+| `setRelative(x, y, z, block)` | Place a block at a position relative to the unit's origin |
+| `fill(block)` | Fill the entire unit with one block |
+| `fill(start, end, block)` | Fill a rectangular region |
+| `fillHeight(minY, maxY, block)` | Fill all columns between two Y values |
+| `fillBiome(biome)` | Fill the entire unit with a biome |
+| `setAll(supplier)` | Set every position using a `(x,y,z) -> Block` supplier |
+| `setAllRelative(supplier)` | Same but with relative coordinates |
+
+## Flat world generator
+
+The demo uses this pattern to build a simple flat world:
+
+```java
+instanceContainer.setGenerator(unit -> {
+    unit.modifier().fillHeight(0, 40, Block.STONE);
+    // Place a torch at the surface of each chunk column
+    if (unit.absoluteStart().blockY() < 40 && unit.absoluteEnd().blockY() > 40) {
+        unit.modifier().setBlock(
+            unit.absoluteStart().blockX(), 40, unit.absoluteStart().blockZ(),
+            Block.TORCH
+        );
+    }
+});
+```
+
+## Noise-based terrain
+
+For varying terrain, calculate block types based on world coordinates. Access the absolute position of each block via `absoluteStart()` plus offsets:
+
+```java
+instance.setGenerator(unit -> {
+    final Point start = unit.absoluteStart();
+    unit.modifier().setAllRelative((x, y, z) -> {
+        // Absolute world coordinates
+        int wx = start.blockX() + x;
+        int wz = start.blockZ() + z;
+
+        // Example: simple sine-wave hills, replace with real noise
+        int surfaceY = 40 + (int)(Math.sin(wx * 0.1) * 5 + Math.cos(wz * 0.1) * 5);
+        int worldY   = start.blockY() + y;
+
+        if (worldY < surfaceY - 3)  return Block.STONE;
+        if (worldY < surfaceY)      return Block.DIRT;
+        if (worldY == surfaceY)     return Block.GRASS_BLOCK;
+        return Block.AIR;
+    });
+});
+```
+
+<Tip>
+Use a library such as [JNoise](https://github.com/Articdive/JNoise) for production-quality coherent noise. `setAllRelative` is the most efficient way to visit every block in a generation unit.
+</Tip>
+
+## Loading Anvil worlds from disk
+
+To load a pre-built Minecraft world saved on disk, use `AnvilLoader`:
+
+```java
+InstanceContainer instance = MinecraftServer.getInstanceManager().createInstanceContainer();
+instance.setChunkLoader(new AnvilLoader("path/to/world"));
+```
+
+`AnvilLoader` reads the standard Minecraft region format (`.mca` files) from the `region/` subdirectory under the path you supply. Block entities are also loaded and their handlers restored if registered via `BlockManager`.
+
+<Note>
+`AnvilLoader` can be combined with a generator. If a chunk exists in the Anvil files it is loaded from disk; otherwise the generator is called to fill it procedurally.
+</Note>
+
+### Saving world data
+
+`AnvilLoader` also implements `ChunkLoader.saveChunk`, so calling `instance.saveChunksToStorage()` writes modified chunks back to the same directory.
+
+## Lighting
+
+By default, instances use `DynamicChunk` which does not compute block lighting. Swap to `LightingChunk` for proper sky- and block-light propagation:
+
+```java
+instance.setChunkSupplier(LightingChunk::new);
+```
+
+<Warning>
+`LightingChunk` recomputes lighting when blocks change. This is more expensive than `DynamicChunk` — enable it only when client-side lighting matters.
+</Warning>
+
+## Complete setup example
+
+```java
+InstanceManager instanceManager = MinecraftServer.getInstanceManager();
+InstanceContainer instance = instanceManager.createInstanceContainer();
+
+// Generator
+instance.setGenerator(unit -> {
+    unit.modifier().fillHeight(0, 40, Block.STONE);
+    unit.modifier().fillHeight(38, 40, Block.DIRT);
+    unit.modifier().fillHeight(40, 41, Block.GRASS_BLOCK);
+});
+
+// Lighting
+instance.setChunkSupplier(LightingChunk::new);
+
+// Stop time from advancing
+instance.setTimeRate(0);
+instance.setTime(6000); // midday
+
+// Route players into this instance
+MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent.class, event -> {
+    event.setSpawningInstance(instance);
+    event.getPlayer().setRespawnPoint(new Pos(0, 41, 0));
+});
+```
+
+<CardGroup cols={2}>
+  <Card title="Instances" href="/concepts/instances">
+    How instances and chunk loading work
+  </Card>
+  <Card title="Blocks" href="/guides/blocks">
+    Block properties, handlers, and placement rules
+  </Card>
+</CardGroup>

@@ -1,97 +1,88 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Minestom — Lightweight Minecraft Server Framework"
+description: "Build custom Minecraft game experiences with a high-performance, developer-first server framework written in Java."
 ---
 
-## Setting up
+Minestom is a Java library that lets you build Minecraft servers from the ground up. Unlike traditional server software, Minestom ships with **no world generation, no default gameplay, and no built-in commands** — giving you complete control over every aspect of the player experience.
 
-Get your documentation site up and running in minutes.
+It targets Minecraft **1.21.1** and is designed for developers who need performance, flexibility, and direct access to the server's internals.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get a Minestom server running in under five minutes with a working player spawn example.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Add Minestom to your Gradle or Maven project via JitPack or Maven Central.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Core Concepts" icon="book" href="/concepts/instances">
+    Understand instances, entities, events, and the threading model before you build.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/minecraft-server">
+    Explore the full public API surface — managers, registries, and server lifecycle.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why Minestom?
 
-Everything you need to create world-class documentation.
+Minestom is not a drop-in replacement for Bukkit or Paper. It is a **blank slate** — ideal for minigame servers, game platforms, and any use case where standard Minecraft gameplay would get in the way.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Zero overhead by default" icon="gauge-high">
+    No plugins to disable, no world to pregenerate. You only pay for what you implement.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Multi-threaded ticking" icon="microchip">
+    The `ThreadDispatcher` distributes instance and entity ticks across configurable thread pools.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Hierarchical event system" icon="diagram-project">
+    `EventNode` trees let you filter, scope, and compose event listeners without global pollution.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Type-safe commands" icon="terminal">
+    The command builder provides argument parsing, tab-completion, and execution conditions in a fluent API.
   </Card>
-</Columns>
+  <Card title="Adventure integration" icon="palette">
+    Full support for the Adventure library — rich text, boss bars, titles, sounds, and resource packs.
+  </Card>
+  <Card title="Dynamic registries" icon="database">
+    Register custom dimensions, biomes, enchantments, and more at runtime without datapacks.
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Get started in four steps
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Add the dependency">
+    Add Minestom to your `build.gradle.kts` or `pom.xml`. See [Installation](/installation) for coordinates.
+  </Step>
+  <Step title="Initialize the server">
+    Call `MinecraftServer.init()` to bootstrap all managers and registries.
+  </Step>
+  <Step title="Register your game logic">
+    Add event listeners, commands, instances, and entities between `init()` and `start()`.
+  </Step>
+  <Step title="Start listening">
+    Call `minecraftServer.start("0.0.0.0", 25565)` to begin accepting connections.
+  </Step>
+</Steps>
+
+## Explore by topic
+
+<CardGroup cols={3}>
+  <Card title="Instances and worlds" icon="earth-americas" href="/concepts/instances">
+    Create and manage game worlds
+  </Card>
+  <Card title="Entities and players" icon="person" href="/concepts/entities">
+    Spawn, control, and track entities
+  </Card>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    React to game events with scoped listeners
+  </Card>
+  <Card title="Commands" icon="terminal" href="/guides/commands">
+    Build server commands with argument parsing
+  </Card>
+  <Card title="World generation" icon="mountain" href="/guides/world-generation">
+    Implement custom chunk generators
+  </Card>
+  <Card title="Scheduling" icon="clock" href="/guides/scheduling">
+    Run delayed and repeating tasks
+  </Card>
+</CardGroup>

@@ -1,0 +1,294 @@
+---
+title: "Commands"
+description: "Create commands by extending the Command class, defining argument syntaxes, and registering with the CommandManager."
+---
+
+Commands in Minestom are built by extending the `Command` class. Each command defines one or more syntaxes — combinations of typed arguments and an executor — plus an optional default executor for invalid input and a condition that controls who can run it.
+
+## Creating a command
+
+Extend `Command` and define your syntaxes in the constructor:
+
+```java
+import net.minestom.server.command.builder.Command;
+import net.minestom.server.command.builder.arguments.ArgumentType;
+
+public class HealthCommand extends Command {
+
+    public HealthCommand() {
+        super("health");
+
+        setCondition(Conditions::playerOnly);
+        setDefaultExecutor(this::defaultExecutor);
+
+        var modeArg = ArgumentType.Word("mode").from("set", "add");
+        var valueArg = ArgumentType.Integer("value").between(0, 100);
+
+        setArgumentCallback(this::onModeError, modeArg);
+        setArgumentCallback(this::onValueError, valueArg);
+
+        addSyntax(this::onHealthCommand, modeArg, valueArg);
+    }
+
+    private void defaultExecutor(CommandSender sender, CommandContext context) {
+        sender.sendMessage(Component.text("Usage: /health set|add <number>"));
+    }
+
+    private void onHealthCommand(CommandSender sender, CommandContext context) {
+        final Player player = (Player) sender;
+        final String mode = context.get("mode");
+        final int value = context.get("value");
+
+        switch (mode.toLowerCase()) {
+            case "set" -> player.setHealth(value);
+            case "add" -> player.setHealth(player.getHealth() + value);
+        }
+
+        player.sendMessage(Component.text("You now have " + player.getHealth() + " health"));
+    }
+
+    private void onModeError(CommandSender sender, ArgumentSyntaxException exception) {
+        sender.sendMessage(Component.text("'" + exception.getInput() + "' must be 'set' or 'add'"));
+    }
+
+    private void onValueError(CommandSender sender, ArgumentSyntaxException exception) {
+        sender.sendMessage(Component.text(exception.getInput() + " is not between 0 and 100"));
+    }
+}
+```
+
+<Steps>
+
+<Step title="Extend Command">
+Call `super("name")` — or `super("name", "alias1", "alias2")` — to set the command name and any aliases.
+</Step>
+
+<Step title="Set a default executor">
+`setDefaultExecutor` fires when no syntax matches or when the command is run without arguments. Use it to print usage information.
+</Step>
+
+<Step title="Define argument types">
+Use `ArgumentType.*` factory methods to create typed arguments. See [Argument types](#argument-types) below.
+</Step>
+
+<Step title="Register syntaxes">
+Call `addSyntax(executor, arg1, arg2, ...)` for each valid combination of arguments. The executor receives a `CommandContext` from which you retrieve argument values with `context.get(argId)` or `context.get(argument)`.
+</Step>
+
+<Step title="Register the command">
+Pass an instance to `MinecraftServer.getCommandManager().register(new HealthCommand())`.
+</Step>
+
+</Steps>
+
+## Registering commands
+
+```java
+MinecraftServer.getCommandManager().register(
+    new HealthCommand(),
+    new GamemodeCommand(),
+    new TeleportCommand()
+);
+```
+
+Commands can also be unregistered at runtime:
+
+```java
+MinecraftServer.getCommandManager().unregister(command);
+```
+
+## Argument types
+
+All argument types live in `ArgumentType`. Arguments are identified by the string `id` you pass to each factory method, which is the key you use with `context.get(id)`.
+
+<Accordion title="Primitive and string types">
+
+| Factory method | Returned type | Notes |
+|---|---|---|
+| `ArgumentType.Integer("id")` | `int` | Supports `.between(min, max)` |
+| `ArgumentType.Long("id")` | `long` | |
+| `ArgumentType.Float("id")` | `float` | |
+| `ArgumentType.Double("id")` | `double` | |
+| `ArgumentType.Boolean("id")` | `boolean` | |
+| `ArgumentType.Word("id")` | `String` | Single word. Use `.from("a","b")` to restrict to specific values. |
+| `ArgumentType.String("id")` | `String` | Quoted string |
+| `ArgumentType.StringArray("id")` | `String[]` | Remainder of input split by space |
+| `ArgumentType.Literal("id")` | `String` | Exact literal token |
+
+</Accordion>
+
+<Accordion title="Minecraft-specific types">
+
+| Factory method | Returned type |
+|---|---|
+| `ArgumentType.Entity("id")` | `EntityFinder` |
+| `ArgumentType.ItemStack("id")` | `ItemStack` |
+| `ArgumentType.BlockState("id")` | `Block` |
+| `ArgumentType.Component("id")` | `Component` |
+| `ArgumentType.Color("id")` | `ChatColor` |
+| `ArgumentType.NBT("id")` | `BinaryTag` |
+| `ArgumentType.NbtCompound("id")` | `CompoundBinaryTag` |
+| `ArgumentType.UUID("id")` | `UUID` |
+| `ArgumentType.ResourceLocation("id")` | `String` (namespaced key) |
+| `ArgumentType.IntRange("id")` | `IntRange` |
+| `ArgumentType.FloatRange("id")` | `FloatRange` |
+| `ArgumentType.RelativeBlockPosition("id")` | `RelativeBlockPosition` |
+| `ArgumentType.RelativeVec3("id")` | `RelativeVec` |
+| `ArgumentType.RelativeVec2("id")` | `RelativeVec` |
+| `ArgumentType.Enum("id", MyEnum.class)` | `MyEnum` |
+
+</Accordion>
+
+### Restricting word arguments
+
+`ArgumentType.Word` with `.from(...)` builds an enum-like argument that shows suggestions and validates input:
+
+```java
+var modeArg = ArgumentType.Word("mode").from("set", "add");
+```
+
+### Optional arguments
+
+Mark an argument as optional and supply a default value:
+
+```java
+var countArg = ArgumentType.Integer("count").setDefaultValue(() -> 1);
+```
+
+When you call `addSyntax` with optional arguments at the end, Minestom automatically generates the shorter syntaxes as well.
+
+## Reading argument values
+
+Use `context.get` with either the argument instance or the string id:
+
+```java
+addSyntax((sender, context) -> {
+    EntityFinder finder = context.get(playerArg);  // by instance
+    int count          = context.get("count");     // by id
+}, playerArg, countArg);
+```
+
+## Command conditions
+
+`setCondition` accepts a `CommandCondition` — a `(CommandSender, String) -> boolean` — that runs before any syntax is checked. If it returns `false`, the command is invisible to the player and cannot be executed.
+
+```java
+// Built-in helpers in Conditions
+setCondition(Conditions::playerOnly);    // rejects console
+setCondition(Conditions::consoleOnly);   // rejects players
+
+// Custom condition (e.g. permission check)
+setCondition((sender, cmd) -> {
+    if (!(sender instanceof Player p)) return false;
+    return p.getPermissionLevel() >= 2;
+});
+```
+
+## Sender type checking
+
+Commands can be run by players and by the console (`ConsoleSender`). Check inside the executor when needed:
+
+```java
+addSyntax((sender, context) -> {
+    if (sender instanceof Player player) {
+        player.sendMessage(Component.text("Hello, player!"));
+    } else {
+        sender.sendMessage(Component.text("Hello, console!"));
+    }
+}, someArg);
+```
+
+## Argument error callbacks
+
+Register a callback for a specific argument with `setArgumentCallback`. It fires when that argument fails to parse — useful for descriptive error messages:
+
+```java
+var valueArg = ArgumentType.Integer("value").between(0, 100);
+
+setArgumentCallback((sender, exception) -> {
+    sender.sendMessage(Component.text(
+        exception.getInput() + " is not a valid number between 0 and 100"
+    ));
+}, valueArg);
+```
+
+## Subcommands
+
+Add nested commands with `addSubcommand`:
+
+```java
+public class TeleportCommand extends Command {
+    public TeleportCommand() {
+        super("tp");
+
+        var posArg    = ArgumentType.RelativeVec3("pos");
+        var playerArg = ArgumentType.Word("player");
+
+        addSyntax(this::onPositionTeleport, posArg);
+        addSyntax(this::onPlayerTeleport,   playerArg);
+    }
+
+    private void onPositionTeleport(CommandSender sender, CommandContext context) {
+        final Player player = (Player) sender;
+        final RelativeVec relativeVec = context.get("pos");
+        final Pos position = player.getPosition().withCoord(relativeVec.from(player));
+        player.teleport(position);
+    }
+
+    private void onPlayerTeleport(CommandSender sender, CommandContext context) {
+        final String targetName = context.get("player");
+        Player target = MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(targetName);
+        if (sender instanceof Player player && target != null) {
+            player.teleport(target.getPosition());
+        }
+    }
+}
+```
+
+## Gamemode command — real example
+
+The demo [`GamemodeCommand`](https://github.com/Minestom/Minestom/blob/master/demo/src/main/java/net/minestom/demo/commands/GamemodeCommand.java) shows how to combine an enum argument with an optional entity selector:
+
+```java
+public class GamemodeCommand extends Command {
+
+    public GamemodeCommand() {
+        super("gamemode", "gm");
+
+        ArgumentEnum<GameMode> gamemode = ArgumentType.Enum("gamemode", GameMode.class)
+                .setFormat(ArgumentEnum.Format.LOWER_CASED);
+
+        ArgumentEntity player = ArgumentType.Entity("targets").onlyPlayers(true);
+
+        setDefaultExecutor((sender, context) ->
+                sender.sendMessage(Component.text("Usage: /gamemode <mode> [targets]", NamedTextColor.RED)));
+
+        // /gamemode <mode>  — sets the sender's own gamemode
+        addSyntax((sender, context) -> {
+            if (!(sender instanceof Player p)) {
+                sender.sendMessage(Component.text("Run this in-game."));
+                return;
+            }
+            p.setGameMode(context.get(gamemode));
+        }, gamemode);
+
+        // /gamemode <mode> [targets]  — sets gamemode for others
+        addSyntax((sender, context) -> {
+            EntityFinder finder = context.get(player);
+            GameMode mode = context.get(gamemode);
+            finder.find(sender).forEach(entity -> {
+                if (entity instanceof Player p) p.setGameMode(mode);
+            });
+        }, gamemode, player);
+    }
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="Events" href="/concepts/events">
+    Handle player and server events
+  </Card>
+  <Card title="Players" href="/guides/players">
+    Work with the Player API
+  </Card>
+</CardGroup>

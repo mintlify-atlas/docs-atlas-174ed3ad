@@ -1,0 +1,71 @@
+---
+title: "Authentication"
+description: "Configure online mode (Mojang auth), offline mode, or proxy forwarding for your Minestom server."
+---
+
+Minestom selects an authentication mode at startup by passing an `Auth` implementation to `MinecraftServer.init()`. `Auth` is a sealed interface — you choose one of the built-in implementations.
+
+## Offline mode (default)
+
+Offline mode skips Mojang session verification. Players can connect with any username, and UUIDs are derived from the username (not the real Mojang UUID).
+
+```java
+MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Offline());
+// or simply (Offline is the default):
+MinecraftServer minecraftServer = MinecraftServer.init();
+```
+
+<Warning>
+Offline mode does not verify player identity. Anyone can join with any username. Use it only for development, LAN servers, or networks with their own proxy-level auth.
+</Warning>
+
+## Online mode (Mojang authentication)
+
+To require valid Mojang accounts, use `Auth.Online`. This verifies the session token with Mojang's session server before allowing the player to join.
+
+```java
+MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Online());
+```
+
+In online mode:
+- Player UUIDs are the real Mojang UUIDs
+- Player skins are fetched automatically from Mojang
+- The connection is encrypted
+
+## Velocity proxy forwarding
+
+If your server sits behind a [Velocity](https://velocitypowered.com/) proxy, use `Auth.Velocity` to verify the forwarded player identity using a shared secret key:
+
+```java
+MinecraftServer minecraftServer = MinecraftServer.init(
+    new Auth.Velocity(Key.key("your-velocity-secret"))
+);
+```
+
+The key must match the `forwarding-secret` configured in your Velocity `velocity.toml`.
+
+## BungeeCord proxy forwarding
+
+For BungeeCord (or a fork like Waterfall), use `Auth.Bungee`. Optionally pass a set of BungeeGuard tokens for additional security:
+
+```java
+// Without BungeeGuard
+MinecraftServer minecraftServer = MinecraftServer.init(new Auth.Bungee(null));
+
+// With BungeeGuard tokens
+MinecraftServer minecraftServer = MinecraftServer.init(
+    new Auth.Bungee(Set.of("token1", "token2"))
+);
+```
+
+<Warning>
+Without BungeeGuard tokens, any connection claiming to be a BungeeCord proxy will be trusted. Always use BungeeGuard tokens in production.
+</Warning>
+
+## Auth URL override
+
+For online mode, the Mojang session server URL can be overridden with a system property (useful for testing or custom launchers):
+
+```bash
+-Dminestom.auth.url=https://my-session-server.example.com/session/minecraft/hasJoined
+```

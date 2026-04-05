@@ -1,0 +1,89 @@
+---
+title: "Configuration"
+description: "Configure Minestom server behavior using JVM system properties via ServerFlag."
+---
+
+Minestom has no configuration file. All tuneable values are read from JVM system properties at startup via the `ServerFlag` class. Set them with `-D` on the command line or with `System.setProperty()` before calling `MinecraftServer.init()`.
+
+## Setting flags
+
+**Command line:**
+```bash
+java -Dminestom.tps=20 -Dminestom.dispatcher-threads=4 -jar myserver.jar
+```
+
+**In code (must be before `init()`):**
+```java
+System.setProperty("minestom.tps", "20");
+MinecraftServer minecraftServer = MinecraftServer.init();
+```
+
+## Server behavior flags
+
+| Property | Default | Description |
+|---|---|---|
+| `minestom.tps` | `20` | Server ticks per second |
+| `minestom.max-tick-catch-up` | `5` | Max ticks to catch up after lag |
+| `minestom.chunk-view-distance` | `8` | Default chunk view distance |
+| `minestom.entity-view-distance` | `5` | Default entity view distance |
+| `minestom.entity-synchronization-ticks` | `20` | Ticks between entity sync |
+| `minestom.dispatcher-threads` | `1` | Tick thread count |
+| `minestom.shutdown-on-signal` | `true` | Stop cleanly on SIGTERM |
+| `minestom.accept-transfers` | `false` | Accept player transfers (1.20.5+) |
+
+## Network flags
+
+| Property | Default | Description |
+|---|---|---|
+| `minestom.packet-per-tick` | `50` | Max packets processed per player per tick |
+| `minestom.packet-queue-size` | `1000` | Inbound packet queue size |
+| `minestom.keep-alive-delay` | `10000` | Keep-alive interval (ms) |
+| `minestom.keep-alive-kick` | `15000` | Kick timeout after missing keep-alive (ms) |
+| `minestom.max-packet-size` | `2097151` | Max packet size (bytes) |
+| `minestom.tcp-no-delay` | `true` | Enable TCP_NODELAY |
+| `minestom.send-buffer-size` | `262143` | Socket send buffer (bytes) |
+| `minestom.receive-buffer-size` | `32767` | Socket receive buffer (bytes) |
+
+## Packet optimization flags
+
+| Property | Default | Description |
+|---|---|---|
+| `minestom.grouped-packet` | `true` | Batch packets to nearby players |
+| `minestom.cached-packet` | `true` | Cache serialized packets for viewers |
+| `minestom.viewable-packet` | `true` | Use viewable packet optimization |
+
+## Chunk update flags
+
+| Property | Default | Description |
+|---|---|---|
+| `minestom.chunk-queue.min-per-tick` | `0.01` | Min chunks sent per tick per player |
+| `minestom.chunk-queue.max-per-tick` | `64.0` | Max chunks sent per tick per player |
+
+## Authentication flags
+
+| Property | Default | Description |
+|---|---|---|
+| `minestom.auth.url` | Mojang session URL | Session server URL for online mode |
+| `minestom.auth.prevent-proxy-connections` | `false` | Reject proxy connections |
+
+## Reading flags in code
+
+Read any flag value directly from `ServerFlag`:
+
+```java
+int threads = ServerFlag.DISPATCHER_THREADS;
+int tps = ServerFlag.SERVER_TICKS_PER_SECOND;
+int viewDist = ServerFlag.CHUNK_VIEW_DISTANCE;
+```
+
+<Warning>
+Flags are read once at class-load time. Changing system properties after `MinecraftServer.init()` has no effect on most flags.
+</Warning>
+
+## Compression threshold
+
+Packet compression is configured before `start()`:
+
+```java
+MinecraftServer.setCompressionThreshold(256); // bytes; 0 = disabled
+```

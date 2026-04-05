@@ -1,0 +1,162 @@
+---
+title: "Threading model"
+description: "Minestom ticks instances and entities across a pool of TickThreads. This page explains how work is distributed and how to safely access entities from outside their tick thread."
+---
+
+Minestom runs its tick loop across a configurable pool of `TickThread`s managed by a `ThreadDispatcher`. Understanding this model is important whenever you need to read or write entity state from an asynchronous context.
+
+## Tick threads and partitions
+
+The `ThreadDispatcher` divides work into _partitions_. In the default Minestom setup, each loaded chunk is a partition. Each partition is assigned to a `TickThread`, and all entities inside that partition tick on the same thread.
+
+At the end of every tick, the dispatcher calls `refreshThreads()`, which uses the configured `ThreadProvider` to reassign partitions to threads. The default provider (`ThreadProvider.counter()`) round-robins partitions across the available threads.
+
+```
+TickThread-0              TickThread-1
+  chunk(0,0) → entities     chunk(1,0) → entities
+  chunk(0,1) → entities     chunk(1,1) → entities
+  ...                        ...
+```
+
+### Configuring thread count
+
+The number of tick threads is controlled by the `minestom.dispatcher-threads` system property, which defaults to `1`. Set it before calling `MinecraftServer.init()`:
+
+```bash
+java -Dminestom.dispatcher-threads=4 -jar myserver.jar
+```
+
+Or read the current value at runtime:
+
+```java
+int threads = ServerFlag.DISPATCHER_THREADS;
+```
+
+<Note>
+  Using more than one dispatcher thread requires careful use of the `Acquirable` API. A single-threaded setup (`DISPATCHER_THREADS=1`) is simpler to reason about and sufficient for most small servers.
+</Note>
+
+## Thread safety
+
+Entity state is only safe to read or write from the `TickThread` that owns the entity's current chunk. Accessing entity state from an arbitrary thread — such as a virtual thread handling a database call, or a timer task — can cause data races.
+
+Minestom provides the `Acquirable` API to safely cross thread boundaries.
+
+## The Acquirable API
+
+Every `Entity` implements `AcquirableSource<Entity>`. Call `acquirable()` to get the `Acquirable<Entity>` wrapper:
+
+```java
+Acquirable<Entity> acquirable = entity.acquirable();
+```
+
+### sync
+
+`sync(Consumer<T>)` locks the entity's tick thread, runs your callback on the caller's thread (blocking until the lock is free), then unlocks:
+
+```java
+acquirable.sync(e -> {
+    e.teleport(new Pos(0, 64, 0));
+});
+```
+
+This is the most common pattern for external code that needs to modify an entity. It blocks the calling thread until the tick thread releases the lock at the end of its current tick.
+
+### applySync
+
+`applySync(Function<T, R>)` is the same as `sync` but returns a value:
+
+```java
+Pos position = acquirable.applySync(Entity::getPosition);
+```
+
+### lock / unlock
+
+For cases where you cannot use a callback, lock manually and remember to always unlock:
+
+```java
+Acquired<Entity> acquired = acquirable.lock();
+try {
+    acquired.get().teleport(new Pos(0, 64, 0));
+} finally {
+    acquired.unlock();
+}
+```
+
+### local and isLocal
+
+If your code is already executing on the entity's tick thread (e.g., inside an `update()` override or an event handler called from within the tick), no lock is needed. Use `isLocal()` to check, or `local()` to get an `Optional` that is only present when safe:
+
+```java
+acquirable.local().ifPresent(e -> {
+    // safe — we are on the correct tick thread
+    e.setVelocity(Vec.ZERO);
+});
+```
+
+### Checking ownership
+
+Enable strict ownership checking for debugging by setting the `minestom.acquirable-strict` system property:
+
+```bash
+java -Dminestom.acquirable-strict=true -jar myserver.jar
+```
+
+With strict mode enabled, calling `acquirable.assertOwnership()` throws `AcquirableOwnershipException` if the current thread does not own the entity.
+
+## When you don't need Acquirable
+
+If your code runs inside the tick loop — inside `Entity.update()`, an event handler fired during a tick, or a task scheduled with `entity.scheduleNextTick()` — you are already on the correct tick thread and can access the entity directly without acquiring it.
+
+```java
+// Safe — runs on the entity's tick thread
+entity.scheduleNextTick(e -> {
+    e.teleport(new Pos(0, 64, 0));
+});
+```
+
+```java
+// Safe — event handlers fire on the tick thread of the entity or instance
+instance.eventNode().addListener(EntityDeathEvent.class, event -> {
+    event.getEntity().remove();
+});
+```
+
+## ThreadProvider
+
+`ThreadProvider<P>` is a functional interface that maps a partition `P` to a thread index. Minestom uses it to decide which `TickThread` handles each chunk:
+
+```java
+@FunctionalInterface
+public interface ThreadProvider<T> {
+    int findThread(T partition);
+}
+```
+
+The built-in `ThreadProvider.counter()` assigns each new partition to the next thread in round-robin order and never reassigns (`RefreshType.NEVER`).
+
+You can supply a custom `ThreadProvider` to colocate chunks that frequently interact — for example, placing all chunks within the same region on the same thread:
+
+```java
+ThreadProvider<Chunk> regionProvider = chunk -> {
+    int regionX = chunk.getChunkX() >> 5; // 32-chunk regions
+    int regionZ = chunk.getChunkZ() >> 5;
+    return Math.abs(regionX * 31 + regionZ) % ServerFlag.DISPATCHER_THREADS;
+};
+```
+
+<Warning>
+  Custom `ThreadProvider` implementations that use `RefreshType.ALWAYS` will reassign chunks every tick. This is expensive and can cause contention. Only use it if you have a specific need to rebalance load dynamically.
+</Warning>
+
+## Listing entities on the current thread
+
+`Acquirable.localEntities()` returns a stream of all entities ticking on the current `TickThread`. This is useful for batch operations that should only touch local entities:
+
+```java
+Acquirable.localEntities()
+    .filter(e -> e instanceof Player)
+    .forEach(e -> ((Player) e).sendMessage("tick!"));
+```
+
+This stream is only populated when called from a `TickThread`; it returns empty on any other thread.

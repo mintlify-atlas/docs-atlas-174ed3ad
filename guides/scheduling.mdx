@@ -1,0 +1,95 @@
+---
+title: "Scheduling"
+description: "Schedule delayed and repeating tasks using Minestom's SchedulerManager."
+---
+
+## Basic task scheduling
+
+Get the scheduler from `MinecraftServer` and use the fluent builder:
+
+```java
+SchedulerManager scheduler = MinecraftServer.getSchedulerManager();
+
+// Run once after a delay
+scheduler.buildTask(() -> System.out.println("Fired after 5 seconds"))
+    .delay(Duration.ofSeconds(5))
+    .schedule();
+
+// Run repeatedly
+scheduler.buildTask(() -> broadcastMessage())
+    .delay(Duration.ofSeconds(1))
+    .repeat(Duration.ofSeconds(10))
+    .schedule();
+```
+
+From the demo — update the tab-list header every 10 ticks:
+
+```java
+MinecraftServer.getSchedulerManager().buildTask(() -> {
+    long ramUsage = benchmarkManager.getUsedMemory() / (long) 1e6;
+    TickMonitor tickMonitor = LAST_TICK.get();
+    Component header = Component.text("RAM USAGE: " + ramUsage + " MB");
+    Audiences.players().sendPlayerListHeaderAndFooter(header, Component.empty());
+}).repeat(10, TimeUnit.SERVER_TICK).schedule();
+```
+
+## Using ticks as the time unit
+
+Import `net.minestom.server.utils.time.TimeUnit` for tick-based durations:
+
+```java
+import net.minestom.server.utils.time.TimeUnit;
+
+scheduler.buildTask(myRunnable)
+    .delay(1, TimeUnit.SERVER_TICK)
+    .repeat(20, TimeUnit.SERVER_TICK) // every second
+    .schedule();
+```
+
+## Cancelling tasks
+
+`schedule()` returns a `Task` you can cancel later:
+
+```java
+Task task = scheduler.buildTask(myRunnable)
+    .repeat(Duration.ofSeconds(1))
+    .schedule();
+
+// Cancel it later
+task.cancel();
+```
+
+## Shutdown tasks
+
+Register a runnable to run when the server stops cleanly:
+
+```java
+MinecraftServer.getSchedulerManager().buildShutdownTask(() -> {
+    System.out.println("Saving data before shutdown...");
+    saveAllData();
+});
+```
+
+<Note>
+Shutdown tasks run synchronously when `MinecraftServer.stopCleanly()` is called. Keep them fast.
+</Note>
+
+## Instance-scoped scheduling
+
+`Instance` implements `Schedulable`, so you can schedule tasks scoped to an instance's lifecycle:
+
+```java
+instance.scheduler().buildTask(() -> {
+    // runs in the context of this instance
+}).repeat(Duration.ofSeconds(5)).schedule();
+```
+
+## Execution types
+
+By default tasks run at the start of the next tick (`ExecutionType.TICK_START`). You can also run at tick end:
+
+```java
+scheduler.buildTask(myRunnable)
+    .executionType(ExecutionType.TICK_END)
+    .schedule();
+```

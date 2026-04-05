@@ -1,0 +1,78 @@
+---
+title: "MinecraftServer"
+description: "The main entry point for initializing, configuring, and starting a Minestom server."
+---
+
+`MinecraftServer` is the static façade through which you access every manager and registry. Call `init()` once at startup, register your game logic, then call `start()`.
+
+## Lifecycle
+
+```java
+// 1. Initialize — bootstraps all managers and registries
+MinecraftServer server = MinecraftServer.init();
+// or with explicit auth:
+MinecraftServer server = MinecraftServer.init(new Auth.Offline());
+
+// 2. Register game logic here (events, commands, instances...)
+
+// 3. Start accepting connections
+server.start("0.0.0.0", 25565);
+
+// 4. Graceful shutdown (call from any thread)
+MinecraftServer.stopCleanly();
+```
+
+## Managers
+
+| Method | Returns | Description |
+|---|---|---|
+| `getGlobalEventHandler()` | `GlobalEventHandler` | Root event node for the whole server |
+| `getInstanceManager()` | `InstanceManager` | Create and track instances |
+| `getCommandManager()` | `CommandManager` | Register commands |
+| `getConnectionManager()` | `ConnectionManager` | Online players, player provider |
+| `getSchedulerManager()` | `SchedulerManager` | Delayed and repeating tasks |
+| `getBlockManager()` | `BlockManager` | Block handlers and placement rules |
+| `getRecipeManager()` | `RecipeManager` | Crafting/smelting recipes |
+| `getTeamManager()` | `TeamManager` | Scoreboard teams |
+| `getAdvancementManager()` | `AdvancementManager` | Advancements |
+| `getBossBarManager()` | `BossBarManager` | Boss bars (Adventure) |
+| `getExceptionManager()` | `ExceptionManager` | Unhandled exception hook |
+| `getBenchmarkManager()` | `BenchmarkManager` | JVM metrics collection |
+| `getPacketListenerManager()` | `PacketListenerManager` | Low-level packet listeners |
+
+## Registries
+
+| Method | Returns | Description |
+|---|---|---|
+| `getDimensionTypeRegistry()` | `DynamicRegistry<DimensionType>` | Dimensions |
+| `getBiomeRegistry()` | `DynamicRegistry<Biome>` | Biomes |
+| `getDamageTypeRegistry()` | `DynamicRegistry<DamageType>` | Damage types |
+| `getEnchantmentRegistry()` | `DynamicRegistry<Enchantment>` | Enchantments |
+| `getChatTypeRegistry()` | `DynamicRegistry<ChatType>` | Chat types |
+| `getTrimMaterialRegistry()` | `DynamicRegistry<TrimMaterial>` | Armor trim materials |
+| `getTrimPatternRegistry()` | `DynamicRegistry<TrimPattern>` | Armor trim patterns |
+| `getBannerPatternRegistry()` | `DynamicRegistry<BannerPattern>` | Banner patterns |
+
+## Server settings
+
+```java
+// Brand name shown to clients
+MinecraftServer.setBrandName("My Server");
+
+// Difficulty
+MinecraftServer.setDifficulty(Difficulty.HARD);
+
+// Compression threshold (call before start())
+MinecraftServer.setCompressionThreshold(256);
+
+// Status
+boolean running = MinecraftServer.isStarted();
+```
+
+## process()
+
+For lower-level access to all managers in one object, use `MinecraftServer.process()` which returns `ServerProcess`. This is the same object managers delegate to internally.
+
+```java
+ServerProcess process = MinecraftServer.process();
+```

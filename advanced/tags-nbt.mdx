@@ -1,0 +1,97 @@
+---
+title: "Tags and NBT"
+description: "Store arbitrary data on entities, instances, and blocks using Minestom's Tag API."
+---
+
+Minestom's `Tag` API provides a type-safe way to attach arbitrary data to any object that implements `Taggable` — including `Entity`, `Instance`, `Chunk`, and `Block`.
+
+## Creating tags
+
+Define tags as static constants. The key must be unique within your application:
+
+```java
+// Simple value tags
+Tag<Integer> KILLS = Tag.Integer("kills").defaultValue(0);
+Tag<String>  TEAM  = Tag.String("team");
+Tag<Boolean> IS_FROZEN = Tag.Boolean("frozen").defaultValue(false);
+
+// Compound tag for storing a whole object
+Tag<CompoundBinaryTag> DATA = Tag.NBT("myData");
+```
+
+## Reading and writing tags
+
+Any `Taggable` object (entities, instances, chunks, blocks) has `getTag()` and `setTag()`:
+
+```java
+// Write
+player.setTag(KILLS, player.getTag(KILLS) + 1);
+player.setTag(TEAM, "red");
+
+// Read
+int kills = player.getTag(KILLS);    // returns 0 if unset (defaultValue)
+String team = player.getTag(TEAM);  // returns null if unset and no default
+```
+
+## Checking and removing tags
+
+```java
+boolean hasTeam = player.hasTag(TEAM);
+player.removeTag(TEAM);
+```
+
+## TagRecord — structured data
+
+For complex data, define a Java record and use `Tag.Structure()`:
+
+```java
+public record PlayerData(int kills, int deaths, String team) implements TagRecord {
+    static final Tag<PlayerData> TAG = Tag.Structure("playerData", PlayerData.class);
+}
+
+// Set
+player.setTag(PlayerData.TAG, new PlayerData(5, 2, "blue"));
+
+// Get
+PlayerData data = player.getTag(PlayerData.TAG);
+```
+
+## Tags on blocks
+
+Blocks are immutable value objects, but you can create a modified copy with tag data:
+
+```java
+Block chest = Block.CHEST.withTag(MY_CHEST_ID, 42);
+instance.setBlock(pos, chest);
+
+// Read back
+Block at = instance.getBlock(pos);
+int id = at.getTag(MY_CHEST_ID);
+```
+
+## NBT with Adventure
+
+Minestom uses the [Adventure NBT](https://docs.advntr.dev/nbt.html) library (`net.kyori.adventure.nbt`). You can build compound tags directly:
+
+```java
+CompoundBinaryTag nbt = CompoundBinaryTag.builder()
+    .putString("owner", "Notch")
+    .putInt("uses", 0)
+    .build();
+
+player.setTag(DATA, nbt);
+```
+
+## TagHandler (low-level)
+
+`TagHandler` is the underlying storage. You can grab it directly for batch reads/writes:
+
+```java
+TagHandler handler = player.tagHandler();
+handler.setTag(KILLS, 10);
+handler.setTag(TEAM, "red");
+```
+
+<Note>
+Tags are stored in memory only. They are not persisted to disk unless you serialize them yourself (e.g., in a `PlayerDisconnectEvent` handler).
+</Note>

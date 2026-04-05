@@ -1,0 +1,87 @@
+---
+title: "ServerFlag"
+description: "Complete reference for all JVM system property flags that configure Minestom behavior."
+---
+
+`ServerFlag` contains every configurable server setting. Values are read from JVM system properties at class-load time. Set them with `-Dkey=value` on the command line or `System.setProperty()` before `MinecraftServer.init()`.
+
+## Server behavior
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.tps` | `SERVER_TICKS_PER_SECOND` | `20` | Server ticks per second |
+| `minestom.max-tick-catch-up` | `SERVER_MAX_TICK_CATCH_UP` | `5` | Max missed ticks to catch up |
+| `minestom.chunk-view-distance` | `CHUNK_VIEW_DISTANCE` | `8` | Default chunk render distance |
+| `minestom.entity-view-distance` | `ENTITY_VIEW_DISTANCE` | `5` | Default entity tracking distance |
+| `minestom.entity-synchronization-ticks` | `ENTITY_SYNCHRONIZATION_TICKS` | `20` | Ticks between metadata syncs |
+| `minestom.dispatcher-threads` | `DISPATCHER_THREADS` | `1` | Tick thread pool size |
+| `minestom.send-light-after-block-placement-delay` | `SEND_LIGHT_AFTER_BLOCK_PLACEMENT_DELAY` | `100` | Delay (ms) before sending light after block change |
+| `minestom.shutdown-on-signal` | `SHUTDOWN_ON_SIGNAL` | `true` | Stop cleanly on SIGTERM/SIGINT |
+| `minestom.accept-transfers` | `ACCEPT_TRANSFERS` | `false` | Accept player transfers (1.20.5+) |
+
+## Network — rate limiting
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.packet-per-tick` | `PLAYER_PACKET_PER_TICK` | `50` | Max inbound packets processed per player per tick |
+| `minestom.packet-queue-size` | `PLAYER_PACKET_QUEUE_SIZE` | `1000` | Inbound packet queue capacity |
+| `minestom.keep-alive-delay` | `KEEP_ALIVE_DELAY` | `10000` | Keep-alive send interval (ms) |
+| `minestom.keep-alive-kick` | `KEEP_ALIVE_KICK` | `15000` | Kick after missing keep-alive (ms) |
+| `minestom.login-plugin-message-timeout` | `LOGIN_PLUGIN_MESSAGE_TIMEOUT` | `5000` | Login plugin message timeout (ms) |
+| `minestom.known-packs-response-timeout` | `KNOWN_PACKS_RESPONSE_TIMEOUT` | `300000` | Known packs response timeout (ms) |
+
+## Network — buffers
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.max-packet-size` | `MAX_PACKET_SIZE` | `2097151` | Max inbound packet size (bytes) |
+| `minestom.max-packet-size-pre-auth` | `MAX_PACKET_SIZE_PRE_AUTH` | `8192` | Max packet size before login |
+| `minestom.send-buffer-size` | `SOCKET_SEND_BUFFER_SIZE` | `262143` | Socket send buffer (bytes) |
+| `minestom.receive-buffer-size` | `SOCKET_RECEIVE_BUFFER_SIZE` | `32767` | Socket receive buffer (bytes) |
+| `minestom.tcp-no-delay` | `SOCKET_NO_DELAY` | `true` | Enable TCP_NODELAY |
+| `minestom.socket-timeout` | `SOCKET_TIMEOUT` | `15000` | Socket read timeout (ms) |
+| `minestom.pooled-buffer-size` | `POOLED_BUFFER_SIZE` | `16383` | Pooled write buffer size (bytes) |
+
+## Chunk sending
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.chunk-queue.min-per-tick` | `MIN_CHUNKS_PER_TICK` | `0.01` | Min chunk packets per player per tick |
+| `minestom.chunk-queue.max-per-tick` | `MAX_CHUNKS_PER_TICK` | `64.0` | Max chunk packets per player per tick |
+| `minestom.chunk-queue.multiplier` | `CHUNKS_PER_TICK_MULTIPLIER` | `1.0` | Scaling multiplier |
+
+## Packet optimizations
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.grouped-packet` | `GROUPED_PACKET` | `true` | Group packets for common viewers |
+| `minestom.cached-packet` | `CACHED_PACKET` | `true` | Cache serialized form of shared packets |
+| `minestom.viewable-packet` | `VIEWABLE_PACKET` | `true` | Use viewable-based packet path |
+
+## Authentication
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.auth.url` | `AUTH_URL` | Mojang session URL | Session server for online-mode verification |
+| `minestom.auth.prevent-proxy-connections` | `AUTH_PREVENT_PROXY_CONNECTIONS` | `false` | Reject connections from proxies |
+
+## Miscellaneous
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.world-border-size` | `WORLD_BORDER_SIZE` | `29999984` | Default world border diameter |
+| `minestom.map.rgbmapping` | `MAP_RGB_MAPPING` | `"lazy"` | Map color mapping strategy |
+| `minestom.enforce-entity-interaction-range` | `ENFORCE_INTERACTION_LIMIT` | `true` | Validate entity interaction distance |
+
+## Experimental flags
+
+| Property | Field | Default | Description |
+|---|---|---|---|
+| `minestom.registry.unsafe-ops` | `REGISTRY_UNSAFE_OPS` | `false` | Allow unsafe registry mutations |
+| `minestom.event.multiple-parents` | `EVENT_NODE_ALLOW_MULTIPLE_PARENTS` | `false` | Allow EventNode to have multiple parents |
+| `minestom.new-socket-write-lock` | `FASTER_SOCKET_WRITES` | `false` | Alternate socket write path (experimental) |
+| `minestom.acquirable-strict` | `ACQUIRABLE_STRICT` | `false` | Assert Acquirable ownership on every access |
+
+<Warning>
+Experimental flags may be removed or changed without notice. Do not rely on them in production.
+</Warning>

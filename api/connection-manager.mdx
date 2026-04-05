@@ -1,0 +1,62 @@
+---
+title: "ConnectionManager"
+description: "Access online players and configure the player provider."
+---
+
+`ConnectionManager` manages all active player connections. Obtain it with `MinecraftServer.getConnectionManager()`.
+
+## Online players
+
+```java
+ConnectionManager cm = MinecraftServer.getConnectionManager();
+
+// All currently online players
+Collection<Player> players = cm.getOnlinePlayers();
+int count = cm.getOnlinePlayerCount();
+
+// Find by UUID
+Player p = cm.getOnlinePlayerByUuid(uuid);
+
+// Find by username (case-sensitive)
+Player p = cm.getOnlinePlayerByUsername("Notch");
+```
+
+## Player provider
+
+By default Minestom creates plain `Player` instances. Replace the provider to use your own subclass:
+
+```java
+cm.setPlayerProvider(MyCustomPlayer::new);
+```
+
+Your subclass must extend `Player`:
+
+```java
+public class MyCustomPlayer extends Player {
+    private int coins = 0;
+
+    public MyCustomPlayer(PlayerConnection connection, GameProfile profile) {
+        super(connection, profile);
+    }
+
+    public int getCoins() { return coins; }
+    public void addCoins(int amount) { this.coins += amount; }
+}
+```
+
+Then cast players safely in event listeners:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent.class, event -> {
+    MyCustomPlayer p = (MyCustomPlayer) event.getPlayer();
+    p.addCoins(100);
+});
+```
+
+## Disconnecting all players
+
+```java
+for (Player p : cm.getOnlinePlayers()) {
+    p.kick(Component.text("Server is restarting."));
+}
+```

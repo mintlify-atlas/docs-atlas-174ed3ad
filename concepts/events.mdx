@@ -1,0 +1,211 @@
+---
+title: "Event system"
+description: "Minestom's event system is built around a tree of EventNodes. Each node filters, scopes, and propagates events to its listeners and children."
+---
+
+Events in Minestom flow through a tree of `EventNode` objects. The global event handler is the root. Instances and entities each have their own child nodes attached automatically. You can also create custom nodes and attach them anywhere in the tree.
+
+## EventNode tree
+
+```
+GlobalEventHandler (root)
+├── instance.eventNode()      (InstanceEvent)
+│   └── your custom nodes
+├── entity.eventNode()        (EntityEvent)
+│   └── your custom nodes
+└── your custom top-level nodes
+```
+
+When an event fires, it is dispatched from the root and propagates down through every node whose filter matches. A node only processes an event if the node's filter and optional predicate both pass.
+
+## The global event handler
+
+`MinecraftServer.getGlobalEventHandler()` returns the root `GlobalEventHandler`. Listeners registered here receive every matching event from every instance and entity:
+
+```java
+GlobalEventHandler eventHandler = MinecraftServer.getGlobalEventHandler();
+
+eventHandler.addListener(PlayerSpawnEvent.class, event -> {
+    event.getPlayer().setGameMode(GameMode.CREATIVE);
+});
+```
+
+## Creating nodes
+
+Use the static factory methods on `EventNode` to create typed nodes:
+
+| Method | Accepts |
+|---|---|
+| `EventNode.all(name)` | Every event |
+| `EventNode.type(name, filter)` | Events matching the filter's event type |
+| `EventNode.type(name, filter, biPredicate)` | Events matching the filter plus a predicate on both event and handler |
+| `EventNode.event(name, filter, predicate)` | Events matching the filter plus a predicate on the event |
+| `EventNode.value(name, filter, predicate)` | Events matching the filter plus a predicate on the handler value |
+
+### EventFilter constants
+
+`EventFilter` determines both the event supertype and how to extract the "handler" (the relevant object from the event):
+
+| Constant | Event type | Handler type |
+|---|---|---|
+| `EventFilter.ALL` | `Event` | — |
+| `EventFilter.ENTITY` | `EntityEvent` | `Entity` |
+| `EventFilter.PLAYER` | `PlayerEvent` | `Player` |
+| `EventFilter.INSTANCE` | `InstanceEvent` | `Instance` |
+| `EventFilter.INVENTORY` | `InventoryEvent` | `AbstractInventory` |
+| `EventFilter.ITEM` | `ItemEvent` | `ItemStack` |
+| `EventFilter.BLOCK` | `BlockEvent` | `Block` |
+
+### Examples
+
+A node that handles only player events:
+
+```java
+EventNode<PlayerEvent> playerNode = EventNode.type("players", EventFilter.PLAYER);
+```
+
+A node that only fires for creative-mode players:
+
+```java
+EventNode<PlayerEvent> creativeNode = EventNode.value(
+    "creative-only",
+    EventFilter.PLAYER,
+    player -> player.getGameMode() == GameMode.CREATIVE
+);
+```
+
+A node scoped to players in positive X/Z coordinates:
+
+```java
+EventNode<PlayerEvent> posQuadrant = EventNode.type(
+    "pos-xz",
+    EventFilter.PLAYER,
+    (event, player) -> player.getPosition().x() > 0 && player.getPosition().z() > 0
+);
+```
+
+## Adding listeners
+
+Call `addListener` on any node:
+
+```java
+// Simple lambda
+node.addListener(PlayerChatEvent.class, event -> {
+    event.getPlayer().sendMessage("You said: " + event.getMessage());
+});
+```
+
+You can chain multiple `addListener` calls because `addListener` returns `this`:
+
+```java
+EventNode.all("demo")
+    .addListener(PlayerSpawnEvent.class, event -> { /* ... */ })
+    .addListener(PlayerDisconnectEvent.class, event -> { /* ... */ });
+```
+
+## EventListener.builder
+
+Use `EventListener.builder` for conditional or expiring listeners:
+
+```java
+// Fires only once
+EventListener<PlayerLoginEvent> once = EventListener.builder(PlayerLoginEvent.class)
+    .expireCount(1)
+    .handler(event -> System.out.println("First login: " + event.getPlayer().getUsername()))
+    .build();
+node.addListener(once);
+```
+
+```java
+// Fires until the player is in creative mode
+EventListener<PlayerMoveEvent> untilCreative = EventListener.builder(PlayerMoveEvent.class)
+    .expireWhen(event -> event.getPlayer().getGameMode() == GameMode.CREATIVE)
+    .handler(event -> System.out.println("Player moved in non-creative mode"))
+    .build();
+node.addListener(untilCreative);
+```
+
+```java
+// Add a filter — only runs when the player is on the ground
+EventListener<PlayerMoveEvent> groundOnly = EventListener.builder(PlayerMoveEvent.class)
+    .filter(event -> event.getPlayer().isOnGround())
+    .handler(event -> { /* ... */ })
+    .build();
+node.addListener(groundOnly);
+```
+
+## Cancellable events
+
+Events that implement `CancellableEvent` can be cancelled inside a listener. Subsequent listeners on the same node (and child nodes) skip cancelled events by default:
+
+```java
+node.addListener(PlayerBlockBreakEvent.class, event -> {
+    if (someCondition) {
+        event.setCancelled(true);
+    }
+});
+```
+
+To run your listener even on already-cancelled events, use `EventListener.builder` with `ignoreCancelled(false)`:
+
+```java
+EventListener<PlayerBlockBreakEvent> alwaysRun = EventListener.builder(PlayerBlockBreakEvent.class)
+    .ignoreCancelled(false)
+    .handler(event -> System.out.println("Block broken (even if cancelled)"))
+    .build();
+```
+
+## Child nodes
+
+Attach a node as a child of another node. The child receives all events that pass through the parent:
+
+```java
+EventNode<Event> parent = MinecraftServer.getGlobalEventHandler();
+EventNode<PlayerEvent> child = EventNode.type("my-feature", EventFilter.PLAYER);
+
+parent.addChild(child);
+child.addListener(PlayerSpawnEvent.class, event -> { /* ... */ });
+```
+
+Remove a child node when you no longer need it:
+
+```java
+parent.removeChild(child);
+```
+
+This is the recommended way to structure features: create one node per feature, register your listeners on that node, and add it to the global handler. Removing the node removes all its listeners at once.
+
+The demo application uses this pattern directly:
+
+```java
+// From demo/PlayerInit.java
+private final EventNode<Event> DEMO_NODE = EventNode.all("demo")
+    .addListener(EntityAttackEvent.class, event -> { /* ... */ })
+    .addListener(PlayerDeathEvent.class, event -> { /* ... */ });
+
+// In init():
+MinecraftServer.getGlobalEventHandler().addChild(DEMO_NODE);
+```
+
+## Priority and propagation order
+
+Every `EventNode` has an integer priority (`getPriority()` / `setPriority(int)`). Lower values run first. The default priority is `0`. Child nodes are sorted by priority before events propagate through them.
+
+```java
+EventNode<Event> highPriority = EventNode.all("important");
+highPriority.setPriority(-10); // runs before default nodes
+```
+
+## Instance-scoped and entity-scoped nodes
+
+Registered instances and entities each get a scoped `EventNode` that is automatically attached to the global tree:
+
+```java
+// Instance scope — only fires for events inside this instance
+instance.eventNode().addListener(InstanceTickEvent.class, event -> { /* ... */ });
+
+// Entity scope — only fires for events on this entity
+zombie.eventNode().addListener(EntityDeathEvent.class, event -> { /* ... */ });
+```
+
+These nodes are removed from the tree automatically when the instance is unregistered or the entity is removed.

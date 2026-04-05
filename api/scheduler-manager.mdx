@@ -1,0 +1,82 @@
+---
+title: "SchedulerManager"
+description: "API reference for SchedulerManager — task scheduling, repeating tasks, and shutdown hooks."
+---
+
+`SchedulerManager` implements the `Scheduler` interface and provides tick-synchronized task execution. Obtain it with `MinecraftServer.getSchedulerManager()`.
+
+## Task.Builder methods
+
+`buildTask(Runnable)` returns a `Task.Builder` with the following chainable methods:
+
+<ParamField path="delay(Duration)" type="Task.Builder">
+  Wait this duration before the first execution. Omit for immediate execution on the next tick.
+</ParamField>
+
+<ParamField path="delay(long, TimeUnit)" type="Task.Builder">
+  Delay using Minestom's `TimeUnit` (e.g., `TimeUnit.SERVER_TICK`).
+</ParamField>
+
+<ParamField path="repeat(Duration)" type="Task.Builder">
+  Re-schedule after each execution with this interval. Omit for a one-shot task.
+</ParamField>
+
+<ParamField path="repeat(long, TimeUnit)" type="Task.Builder">
+  Repeat using tick-based time.
+</ParamField>
+
+<ParamField path="executionType(ExecutionType)" type="Task.Builder">
+  `TICK_START` (default) or `TICK_END`.
+</ParamField>
+
+<ParamField path="schedule()" type="Task">
+  Finalizes and registers the task. Returns a `Task` handle.
+</ParamField>
+
+## Common patterns
+
+```java
+SchedulerManager s = MinecraftServer.getSchedulerManager();
+
+// One-shot after 3 seconds
+s.buildTask(() -> doSomething())
+    .delay(Duration.ofSeconds(3))
+    .schedule();
+
+// Repeating every 20 ticks (1 second at 20 TPS)
+Task task = s.buildTask(() -> tick())
+    .repeat(20, TimeUnit.SERVER_TICK)
+    .schedule();
+
+// Cancel later
+task.cancel();
+
+// Shutdown hook
+s.buildShutdownTask(() -> savePersistentData());
+```
+
+## scheduleNextTick
+
+Convenience to run something on the very next tick:
+
+```java
+s.scheduleNextTick(() -> System.out.println("next tick!"));
+```
+
+## submitTask (advanced)
+
+For dynamic scheduling — return a new `TaskSchedule` each invocation to control the next delay:
+
+```java
+s.submitTask(() -> {
+    doWork();
+    if (shouldContinue()) {
+        return TaskSchedule.tick(5); // re-run in 5 ticks
+    }
+    return TaskSchedule.stop(); // cancel
+});
+```
+
+## Thread safety
+
+Tasks run on the tick thread by default. Access to game state inside a task is safe. For async work, use `ExecutionType` or schedule from an async context and then re-enter via the scheduler.

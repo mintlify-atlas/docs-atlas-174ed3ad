@@ -1,0 +1,66 @@
+---
+title: "InstanceManager"
+description: "Create, register, and unregister Minestom instances (worlds)."
+---
+
+`InstanceManager` tracks all active instances on the server. Obtain it with `MinecraftServer.getInstanceManager()`.
+
+## Creating instances
+
+```java
+InstanceManager instanceManager = MinecraftServer.getInstanceManager();
+
+// Standard instance with its own chunk storage
+InstanceContainer container = instanceManager.createInstanceContainer();
+
+// Instance with a specific dimension (pass a RegistryKey<DimensionType>)
+DynamicRegistry<DimensionType> dims = MinecraftServer.getDimensionTypeRegistry();
+InstanceContainer nether = instanceManager.createInstanceContainer(
+    dims.getKey(Key.key("minecraft:the_nether"))
+);
+
+// SharedInstance — shares chunks from a container, separate entity list
+SharedInstance shared = instanceManager.createSharedInstance(container);
+```
+
+## Registering and unregistering
+
+`createInstanceContainer()` and `createSharedInstance()` automatically register the instance. To register a custom `Instance` subclass manually:
+
+```java
+instanceManager.registerInstance(myCustomInstance);
+```
+
+Unregister when done (removes it from the tick loop and clears chunks):
+
+```java
+instanceManager.unregisterInstance(instance);
+```
+
+<Warning>
+Unregistering an instance with players still in it will disconnect those players. Move or kick all players first.
+</Warning>
+
+## Listing instances
+
+```java
+Set<Instance> all = instanceManager.getInstances();
+```
+
+## Full example
+
+```java
+InstanceManager im = MinecraftServer.getInstanceManager();
+
+InstanceContainer world = im.createInstanceContainer();
+world.setGenerator(unit -> unit.modifier().fillHeight(0, 40, Block.STONE));
+world.setChunkSupplier(LightingChunk::new);
+world.setTimeRate(0);
+world.setTime(6000); // midday
+
+// Assign players to this instance on join
+MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent.class, event -> {
+    event.setSpawningInstance(world);
+    event.getPlayer().setRespawnPoint(new Pos(0, 41, 0));
+});
+```

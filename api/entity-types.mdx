@@ -1,0 +1,104 @@
+---
+title: "Entity types"
+description: "Reference for EntityType constants and the entity class hierarchy in Minestom."
+---
+
+## Entity class hierarchy
+
+Minestom entities are Java objects that live in an `Instance`. The hierarchy:
+
+```
+Entity
+└── LivingEntity
+    ├── EntityCreature       (mobs — has pathfinding, AI)
+    │   └── (all mob types)
+    ├── Player               (human players)
+    └── (other living entities)
+```
+
+All entities share the base `Entity` API (position, velocity, metadata, tags, events). `LivingEntity` adds health, equipment, and damage. `EntityCreature` adds pathfinding and goal-based AI.
+
+## EntityType constants
+
+All vanilla entity types are available as constants on `EntityType`:
+
+```java
+EntityType zombie   = EntityType.ZOMBIE;
+EntityType creeper  = EntityType.CREEPER;
+EntityType villager = EntityType.VILLAGER;
+EntityType player   = EntityType.PLAYER;
+```
+
+Look up by namespace key:
+
+```java
+EntityType type = EntityType.fromKey("minecraft:zombie");
+```
+
+Iterate all types:
+
+```java
+for (EntityType type : EntityType.values()) {
+    System.out.println(type.key());
+}
+```
+
+## Spawning entities
+
+```java
+// Mob (has AI hooks)
+EntityCreature zombie = new EntityCreature(EntityType.ZOMBIE);
+zombie.setInstance(instance, new Pos(0, 41, 0));
+
+// Generic living entity (no built-in AI)
+LivingEntity ghast = new LivingEntity(EntityType.HAPPY_GHAST);
+ghast.setNoGravity(true);
+ghast.setInstance(instance, new Pos(10, 50, 10));
+
+// Item entity
+ItemEntity item = new ItemEntity(ItemStack.of(Material.DIAMOND));
+item.setPickupDelay(Duration.ofMillis(500));
+item.setInstance(instance, dropPos);
+```
+
+## Entity metadata
+
+Access and modify entity metadata for visual properties:
+
+```java
+// Generic custom name
+entity.set(DataComponents.CUSTOM_NAME, Component.text("Boss"));
+
+// Type-specific metadata
+ZombieVillagerMeta meta = (ZombieVillagerMeta) zombie.getEntityMeta();
+meta.setConversionTime(200); // ticks until conversion
+
+// Edit metadata atomically
+zombie.editEntityMeta(ZombieVillagerMeta.class, m -> {
+    m.setConversionTime(200);
+});
+```
+
+## Entity removal
+
+```java
+entity.remove(); // removes from instance and stops ticking
+```
+
+## Tracking entities in an instance
+
+```java
+// All entities
+Collection<Entity> all = instance.getEntities();
+
+// By type
+instance.getEntities().stream()
+    .filter(e -> e.getEntityType() == EntityType.ZOMBIE)
+    .forEach(e -> e.remove());
+
+// Near a position
+instance.getEntityTracker().nearbyEntities(
+    pos, 10.0, EntityTracker.Target.ENTITIES,
+    entity -> doSomething(entity)
+);
+```

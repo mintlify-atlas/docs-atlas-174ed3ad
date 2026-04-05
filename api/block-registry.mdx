@@ -1,0 +1,81 @@
+---
+title: "Block registry"
+description: "Look up blocks, register custom block handlers, and manage block placement rules via BlockManager."
+---
+
+## Static block registry
+
+All vanilla blocks are available as constants on `Block` and in the static registry:
+
+```java
+// By constant
+Block stone = Block.STONE;
+Block log   = Block.OAK_LOG;
+
+// By namespace key (String or Key)
+Block block = Block.fromKey("minecraft:oak_log");
+Block block = Block.fromKey(Key.key("minecraft:oak_log"));
+
+// Iterate all blocks
+for (Block b : Block.values()) {
+    System.out.println(b.key());
+}
+```
+
+## BlockManager
+
+`BlockManager` handles the runtime mapping of block keys to handler factories and placement rules. Obtain it with `MinecraftServer.getBlockManager()`.
+
+### Registering a handler
+
+```java
+BlockManager bm = MinecraftServer.getBlockManager();
+
+// Register by exact key
+bm.registerHandler("minecraft:chest", () -> MyChestHandler.INSTANCE);
+
+// Register for all matching blocks (using a tag)
+RegistryTag<Block> signs = Block.staticRegistry().getTag(TagKey.ofHash("#minecraft:all_signs"));
+for (RegistryKey<Block> key : signs) {
+    bm.registerHandler(key.key(), () -> signHandler);
+}
+```
+
+The factory `Supplier<BlockHandler>` is called when a chunk loads a block with that key. Return a shared singleton unless your handler has per-block state.
+
+### Registering a placement rule
+
+```java
+bm.registerBlockPlacementRule(new DripstonePlacementRule());
+bm.registerBlockPlacementRule(new BedPlacementRule(Block.RED_BED));
+```
+
+## Block registry tags
+
+Minestom exposes Minecraft's block tags:
+
+```java
+RegistryTag<Block> logs = Block.staticRegistry().getTag(TagKey.ofHash("#minecraft:logs"));
+boolean isLog = logs.contains(someBlock.key());
+```
+
+## Block properties reference
+
+Common blockstate properties and their values:
+
+| Block type | Property | Values |
+|---|---|---|
+| Logs, pillars | `axis` | `x`, `y`, `z` |
+| Doors, trapdoors | `facing` | `north`, `south`, `east`, `west` |
+| Doors | `half` | `upper`, `lower` |
+| Slabs | `type` | `top`, `bottom`, `double` |
+| Stairs | `facing`, `half`, `shape` | various |
+| Beds | `part` | `head`, `foot` |
+| Waterloggable | `waterlogged` | `true`, `false` |
+
+Read and write via:
+
+```java
+String axis = block.getProperty("axis");
+Block rotated = block.withProperty("axis", "x");
+```

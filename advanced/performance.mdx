@@ -1,0 +1,133 @@
+---
+title: "Performance"
+description: "Understand and tune Minestom's threading model, packet optimizations, and chunk loading for high-player-count servers."
+---
+
+Minestom is designed for performance from the ground up. This page covers the key knobs available to you.
+
+## Thread count
+
+By default Minestom uses **one tick thread** (`DISPATCHER_THREADS=1`). For servers with many instances, increase this:
+
+```bash
+-Dminestom.dispatcher-threads=4
+```
+
+Or in code before `init()`:
+```java
+System.setProperty("minestom.dispatcher-threads", "4");
+```
+
+<Tip>
+Start with the number of physical CPU cores. More threads than cores rarely helps and increases lock contention.
+</Tip>
+
+## Packet batching
+
+Three flags control how packets are sent to groups of nearby players:
+
+| Flag | Default | Effect |
+|---|---|---|
+| `minestom.grouped-packet` | `true` | Combine packets destined for the same viewers |
+| `minestom.cached-packet` | `true` | Serialize a packet once for all recipients |
+| `minestom.viewable-packet` | `true` | Use the viewable optimization path |
+
+Disable only for debugging:
+```bash
+-Dminestom.grouped-packet=false
+```
+
+## Chunk view distance
+
+Lower view distance = fewer chunks per player = less memory and fewer packets:
+
+```bash
+-Dminestom.chunk-view-distance=6
+```
+
+The client can request a higher view distance, but Minestom clamps it to this value.
+
+## Chunk send rate
+
+Control how aggressively Minestom sends chunks to connecting players:
+
+```bash
+-Dminestom.chunk-queue.max-per-tick=32.0   # default 64
+-Dminestom.chunk-queue.min-per-tick=0.01
+```
+
+Lower `max-per-tick` reduces CPU spikes during player login.
+
+## LightingChunk vs DynamicChunk
+
+`LightingChunk` recalculates smooth lighting. For minigames where lighting precision is unimportant, use `DynamicChunk` to skip it:
+
+```java
+// With lighting (default demo setup)
+instanceContainer.setChunkSupplier(LightingChunk::new);
+
+// Without lighting (faster)
+instanceContainer.setChunkSupplier(DynamicChunk::new);
+```
+
+## Acquirable — thread-safe entity access
+
+When accessing entities from outside their tick thread, use `Acquirable.sync()` to avoid data races:
+
+```java
+entity.getAcquirable().sync(e -> {
+    e.setHealth(20f);
+});
+```
+
+Prefer `async()` for fire-and-forget operations that don't need a return value — it queues the callback without blocking the calling thread.
+
+## Packet rate limiting
+
+Limit packets processed per player per tick to prevent a single client from flooding the server:
+
+```bash
+-Dminestom.packet-per-tick=50       # default 50
+-Dminestom.packet-queue-size=1000   # default 1000
+```
+
+## Faster socket writes (experimental)
+
+An alternative socket write path can improve throughput on high-connection servers:
+
+```bash
+-Dminestom.new-socket-write-lock=true
+```
+
+## Compression
+
+Enabling compression reduces bandwidth at the cost of CPU. Set the threshold (in bytes) before `start()`:
+
+```java
+// Compress packets larger than 256 bytes (default)
+MinecraftServer.setCompressionThreshold(256);
+
+// Disable compression entirely (useful on localhost)
+MinecraftServer.setCompressionThreshold(0);
+```
+
+## Monitoring
+
+Use the `BenchmarkManager` to collect JVM metrics:
+
+```java
+MinecraftServer.getBenchmarkManager().enable(Duration.ofSeconds(10));
+
+// Later:
+long ramMB = MinecraftServer.getBenchmarkManager().getUsedMemory() / (long) 1e6;
+```
+
+Subscribe to `ServerTickMonitorEvent` to track tick times:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent.class, event -> {
+    TickMonitor m = event.getTickMonitor();
+    double tickMs = m.getTickTime();
+    double acqMs  = m.getAcquisitionTime();
+});
+```

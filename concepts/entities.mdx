@@ -1,0 +1,189 @@
+---
+title: "Entities"
+description: "Every moving object in a Minestom world is an entity. This page covers the entity hierarchy, lifecycle, metadata, and pathfinding."
+---
+
+Every object that exists inside an `Instance` and participates in the tick loop is an `Entity`. Players, mobs, projectiles, item drops, and experience orbs are all entities.
+
+## Class hierarchy
+
+```
+Entity
+└── LivingEntity          (has health, armor, attribute modifiers, equipment)
+    ├── EntityCreature    (adds AI groups, pathfinding via Navigator)
+    │   └── (your custom mob classes)
+    └── Player            (network-connected player)
+```
+
+| Class | Use it when |
+|---|---|
+| `Entity` | Non-living objects: item displays, projectiles, falling blocks |
+| `LivingEntity` | Anything with health that isn't a player or creature |
+| `EntityCreature` | Mobs that need AI and pathfinding |
+| `Player` | Managed automatically — you do not instantiate `Player` directly |
+
+## Spawning an entity
+
+<Steps>
+
+<Step title="Construct the entity">
+
+Pass an `EntityType` constant to the constructor. Every `EntityType` is a static field on the `EntityTypes` interface (accessible via `EntityType`):
+
+```java
+EntityCreature zombie = new EntityCreature(EntityType.ZOMBIE);
+```
+
+For non-creature entities, use `LivingEntity` directly:
+
+```java
+LivingEntity happyGhast = new LivingEntity(EntityType.HAPPY_GHAST);
+happyGhast.setNoGravity(true);
+```
+
+</Step>
+
+<Step title="Add it to an instance">
+
+Call `setInstance` with a target `Instance` and a spawn `Pos`. This returns a `CompletableFuture<Void>` that completes once the target chunk is loaded:
+
+```java
+zombie.setInstance(instance, new Pos(0, 41, 0));
+```
+
+You can chain logic after the entity is fully placed:
+
+```java
+zombie.setInstance(instance, new Pos(0, 41, 0))
+      .thenRun(() -> System.out.println("Zombie spawned"));
+```
+
+<Note>
+  The instance must be registered in `InstanceManager` before you can place an entity into it. Passing an unregistered instance throws an `IllegalStateException`.
+</Note>
+
+</Step>
+
+</Steps>
+
+## Entity lifecycle
+
+```
+construct → setInstance → spawn() → [tick loop: update(time)] → remove() → despawn()
+```
+
+| Moment | What happens |
+|---|---|
+| `setInstance` | Entity is registered in the instance's `EntityTracker`. The protected `spawn()` hook is called. `EntitySpawnEvent` fires. |
+| Each tick | `update(long time)` is called on the entity's assigned `TickThread`. |
+| `remove()` | `EntityDespawnEvent` fires, the entity is removed from the `EntityTracker`, and `despawn()` is called. |
+
+Override `update(long time)` in a subclass to run logic every tick:
+
+```java
+public class MyMob extends EntityCreature {
+    public MyMob() {
+        super(EntityType.ZOMBIE);
+    }
+
+    @Override
+    public void update(long time) {
+        super.update(time); // runs AI and pathfinding
+        // custom tick logic here
+    }
+}
+```
+
+### Removing an entity
+
+Call `remove()` to destroy an entity immediately:
+
+```java
+zombie.remove();
+```
+
+To schedule removal after a delay:
+
+```java
+zombie.scheduleRemove(Duration.of(5, TimeUnit.SECONDS));
+```
+
+`EntityCreature` automatically schedules removal after its death animation plays. The delay is configurable with `setRemovalAnimationDelay(int millis)`.
+
+## Entity metadata
+
+Metadata controls what the client renders — name visibility, glowing, size scaling, and type-specific properties like a zombie's baby state. Every entity has a typed `EntityMeta` that matches its `EntityType`.
+
+Read or write metadata through `getEntityMeta()`:
+
+```java
+// Cast to the concrete meta type for type-specific properties
+if (zombie.getEntityMeta() instanceof ZombieMeta meta) {
+    meta.setBaby(true);
+}
+```
+
+To batch multiple metadata changes into a single packet, use `editEntityMeta`:
+
+```java
+zombie.editEntityMeta(ZombieMeta.class, meta -> {
+    meta.setBaby(true);
+    meta.setCustomNameVisible(true);
+});
+```
+
+You can also set a custom name using the `DataComponents.CUSTOM_NAME` component:
+
+```java
+zombie.set(DataComponents.CUSTOM_NAME, Component.text("Boss", NamedTextColor.RED));
+```
+
+## Attributes
+
+`LivingEntity` supports the full set of Minecraft attribute modifiers (max health, movement speed, attack damage, etc.) through `AttributeInstance`.
+
+Get an attribute instance and add a modifier:
+
+```java
+AttributeInstance speedAttr = zombie.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+speedAttr.addModifier(new AttributeModifier(
+    Key.key("my_plugin/speed_boost"),
+    0.1,
+    AttributeOperation.ADD_VALUE
+));
+```
+
+Clear all non-protected modifiers:
+
+```java
+speedAttr.clearModifiers();
+```
+
+## Pathfinding
+
+`EntityCreature` implements `NavigableEntity` and ships with a built-in `Navigator`. Call `navigator()` to access it and set a path target:
+
+```java
+EntityCreature zombie = new EntityCreature(EntityType.ZOMBIE);
+zombie.setInstance(instance, new Pos(0, 41, 0));
+
+// Walk toward a fixed point
+zombie.navigator().setPathTo(new Pos(50, 41, 50));
+
+// Walk toward another entity (updated each tick)
+zombie.navigator().setPathTo(player);
+```
+
+The navigator replans the path automatically as the entity moves. You can check the current path state via `navigator().getPathPosition()`.
+
+## Entity-scoped events
+
+Each entity has its own `EventNode<EntityEvent>`. Add listeners that fire only for events on that specific entity:
+
+```java
+zombie.eventNode().addListener(EntityDeathEvent.class, event -> {
+    System.out.println("Zombie died");
+});
+```
+
+See [Event system](/concepts/events) for how entity nodes relate to the global event tree.

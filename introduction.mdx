@@ -1,0 +1,66 @@
+---
+title: "Introduction"
+description: "Minestom is a Java library for building custom Minecraft servers from scratch — no world generation, no default gameplay, full developer control."
+---
+
+Minestom is a lightweight, high-performance Minecraft server framework written in Java. It targets **Minecraft 1.21.1** and is licensed under **Apache 2.0**.
+
+Unlike Bukkit or Paper, Minestom is not a platform you install plugins on. It is a library you depend on. There is no default world, no vanilla gameplay, and no built-in commands. You implement exactly what your server needs — nothing more.
+
+## What Minestom provides
+
+- **A Minecraft protocol implementation** — handles packet serialization, authentication, and the full client–server handshake
+- **An instance and chunk system** — you supply generators; Minestom manages chunk loading, lighting, and sending chunks to players
+- **An entity and player system** — full control over entity metadata, equipment, AI, and player state
+- **A type-safe command builder** — argument parsing, tab-completion, and execution conditions in a fluent API
+- **A hierarchical event system** — `EventNode` trees let you scope and compose listeners without global state
+- **Adventure integration** — rich text, boss bars, titles, sounds, and resource packs via the [Adventure](https://docs.advntr.dev/) library
+- **Multi-threaded ticking** — the `ThreadDispatcher` distributes instance and entity ticks across configurable thread pools using Java NIO
+
+## What Minestom does not provide
+
+<Warning>
+  Minestom is **not** a drop-in replacement for Bukkit, Spigot, or Paper. Bukkit plugins do not run on Minestom. There is no compatibility layer.
+</Warning>
+
+- No vanilla world generation — you write chunk generators or leave chunks empty
+- No vanilla mobs or AI — entity behavior is implemented by you
+- No default commands (e.g., `/gamemode`, `/tp`) — you register what you need
+- No plugin loading system — the framework is a library embedded in your application
+
+## Who it's for
+
+Minestom is designed for developers building:
+
+- **Minigame servers** — full control over game rules and player flow without fighting vanilla behavior
+- **Custom game platforms** — lobby systems, battle arenas, parkour maps, or anything that benefits from a blank slate
+- **Technical Minecraft projects** — protocol research, tooling, or server-side automation where vanilla assumptions get in the way
+
+If you are building a survival server that needs to be compatible with vanilla behavior and Bukkit plugins, Minestom is the wrong tool.
+
+## Architecture overview
+
+The server lifecycle follows three steps:
+
+1. Call `MinecraftServer.init()` — bootstraps all managers, registries, and the network layer
+2. Register your game logic — event listeners, commands, instances, entities
+3. Call `minecraftServer.start(host, port)` — begins accepting connections
+
+All managers (instances, commands, events, scheduling, etc.) are accessible as static methods on `MinecraftServer` after `init()` is called.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get a working Minestom server running in about five minutes.
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Add Minestom to your Gradle or Maven project with the correct coordinates.
+  </Card>
+  <Card title="Instances" icon="earth-americas" href="/concepts/instances">
+    Learn how Minestom's instance system replaces traditional world management.
+  </Card>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    Understand the EventNode hierarchy and how to listen for game events.
+  </Card>
+</CardGroup>

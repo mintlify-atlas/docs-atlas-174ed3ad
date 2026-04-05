@@ -1,0 +1,143 @@
+---
+title: "Blocks"
+description: "Work with block constants, blockstate properties, custom block handlers, and placement rules in Minestom."
+---
+
+## Block constants
+
+Every vanilla block is available as a constant on the `Block` class:
+
+```java
+Block stone  = Block.STONE;
+Block grass  = Block.GRASS_BLOCK;
+Block air    = Block.AIR;
+```
+
+You can also look up a block by its namespaced key:
+
+```java
+Block block = Block.fromKey("minecraft:oak_log");
+```
+
+## Setting and getting blocks
+
+Use the `Instance` to place or read blocks at a given position:
+
+```java
+// Set a block at absolute coordinates
+instance.setBlock(new Vec(10, 64, 10), Block.STONE);
+
+// Read the block at a position
+Block current = instance.getBlock(10, 64, 10);
+```
+
+## Blockstate properties
+
+Blocks with properties (doors, slabs, logs, stairs, etc.) expose them via `withProperty()` and `getProperty()`:
+
+```java
+// Rotate an oak log to face east/west
+Block log = Block.OAK_LOG.withProperty("axis", "x");
+
+// Read a property
+String facing = Block.OAK_STAIRS.getProperty("facing"); // "north", "south", etc.
+```
+
+<Tip>
+All valid property names and values match the Minecraft wiki's blockstate documentation.
+</Tip>
+
+## BlockHandler — adding behaviour
+
+Implement `BlockHandler` to give a block custom server-side behaviour. The interface has default no-op implementations for all methods, so you only override what you need:
+
+```java
+public class MyChestHandler implements BlockHandler {
+
+    public static final MyChestHandler INSTANCE = new MyChestHandler();
+
+    @Override
+    public @NotNull Key getKey() {
+        return Key.key("mygame:chest");
+    }
+
+    @Override
+    public boolean onInteract(Interaction interaction) {
+        Player player = interaction.getPlayer();
+        player.openInventory(new Inventory(InventoryType.CHEST_3_ROW, Component.text("Chest")));
+        return false; // false = cancel default interaction (prevents block placement on right-click)
+    }
+
+    @Override
+    public void onPlace(Placement placement) {
+        // called when this block is placed
+    }
+
+    @Override
+    public void onDestroy(Destroy destroy) {
+        // called when this block is broken or replaced
+    }
+}
+```
+
+Attach a handler directly to a block instance:
+
+```java
+Block chest = Block.CHEST.withHandler(MyChestHandler.INSTANCE);
+instance.setBlock(pos, chest);
+```
+
+## Registering handlers by key
+
+Register a handler factory so that every block placed with that key automatically gets the handler assigned:
+
+```java
+BlockManager blockManager = MinecraftServer.getBlockManager();
+blockManager.registerHandler(
+    "minecraft:chest",
+    () -> MyChestHandler.INSTANCE
+);
+```
+
+From the demo, this pattern is used for signs:
+
+```java
+RegistryTag<Block> signTag = Block.staticRegistry().getTag(TagKey.ofHash("#minecraft:all_signs"));
+SignHandler signHandler = new SignHandler();
+for (RegistryKey<Block> key : signTag) {
+    blockManager.registerHandler(key.key(), () -> signHandler);
+}
+```
+
+## Block placement rules
+
+`BlockPlacementRule` lets you override which block is actually placed when a player places a block. This is useful for multi-block structures like beds, doors, and stairs:
+
+```java
+public class BedPlacementRule extends BlockPlacementRule {
+
+    public BedPlacementRule(Block block) {
+        super(block);
+    }
+
+    @Override
+    public @Nullable Block blockPlace(BlockPlacementRule.PlacementState state) {
+        // Return the block that should be placed, or null to cancel
+        return getBlock().withProperty("part", "foot")
+                         .withProperty("facing", getFacingFromPlayer(state.playerPosition()));
+    }
+}
+
+// Register it
+blockManager.registerBlockPlacementRule(new BedPlacementRule(Block.RED_BED));
+```
+
+## Block NBT
+
+Block entities (chests, signs, furnaces, etc.) can carry NBT data via `CompoundBinaryTag`:
+
+```java
+Block sign = Block.OAK_SIGN.withNbt(CompoundBinaryTag.builder()
+    .putString("Text1", "{\"text\":\"Hello\"}").build());
+instance.setBlock(pos, sign);
+```

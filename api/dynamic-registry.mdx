@@ -1,0 +1,85 @@
+---
+title: "DynamicRegistry"
+description: "Register and look up custom dimensions, biomes, enchantments, and other dynamic registry entries."
+---
+
+`DynamicRegistry<T>` is Minestom's runtime registry for data-driven game objects. Unlike static registries (blocks, items, entity types), dynamic registries can be modified at runtime — but only before `MinecraftServer.start()`.
+
+## Available dynamic registries
+
+Access registries via `MinecraftServer` static methods:
+
+| Registry | Type parameter | Accessor |
+|---|---|---|
+| Dimension types | `DimensionType` | `getDimensionTypeRegistry()` |
+| Biomes | `Biome` | `getBiomeRegistry()` |
+| Chat types | `ChatType` | `getChatTypeRegistry()` |
+| Damage types | `DamageType` | `getDamageTypeRegistry()` |
+| Enchantments | `Enchantment` | `getEnchantmentRegistry()` |
+| Trim materials | `TrimMaterial` | `getTrimMaterialRegistry()` |
+| Trim patterns | `TrimPattern` | `getTrimPatternRegistry()` |
+| Banner patterns | `BannerPattern` | `getBannerPatternRegistry()` |
+| Wolf variants | `WolfVariant` | `getWolfVariantRegistry()` |
+| Painting variants | `PaintingVariant` | `getPaintingVariantRegistry()` |
+| Jukebox songs | `JukeboxSong` | `getJukeboxSongRegistry()` |
+| Instruments | `Instrument` | `getInstrumentRegistry()` |
+
+## Registering a custom entry
+
+```java
+DynamicRegistry<DimensionType> registry = MinecraftServer.getDimensionTypeRegistry();
+
+// Register a custom dimension
+RegistryKey<DimensionType> key = registry.register(
+    "mygame:void_dimension",
+    DimensionType.builder()
+        .minY(-64)
+        .height(384)
+        .logicalHeight(384)
+        .coordinateScale(1.0)
+        .ambientLight(1.0f) // full bright
+        .build()
+);
+```
+
+Then use the key when creating an instance:
+
+```java
+instanceManager.createInstanceContainer(key);
+```
+
+## Looking up entries
+
+```java
+DynamicRegistry<Biome> biomes = MinecraftServer.getBiomeRegistry();
+
+// By Key
+Biome plains = biomes.get(Key.key("minecraft:plains"));
+
+// By Key
+Biome custom = biomes.get(Key.key("mygame:my_biome"));
+
+// All entries
+Collection<Biome> all = biomes.values();
+```
+
+## Registering a custom biome
+
+```java
+DynamicRegistry<Biome> biomeRegistry = MinecraftServer.getBiomeRegistry();
+
+RegistryKey<Biome> myBiomeKey = biomeRegistry.register(
+    "mygame:crystal_caves",
+    Biome.builder()
+        .temperature(0.5f)
+        .downfall(0.5f)
+        .effects(BiomeEffects.builder()
+            .waterColor(new Color(0x3F76E4))
+            .build())
+        .build()
+);
+```
+
+<Warning>
+Dynamic registry entries must be registered before `MinecraftServer.start()`. Registering after start is unsupported and may cause client desyncs.
+</Warning>

@@ -1,0 +1,180 @@
+---
+title: "Installation"
+description: "Add Minestom to your Gradle or Maven project using Maven Central."
+---
+
+## Requirements
+
+- **Java 21 or later** — Minestom uses the Java module system (`modularity.inferModulePath`) and requires a modern JDK
+- **Gradle** (Kotlin or Groovy DSL) or **Maven**
+
+## Dependency coordinates
+
+| Field      | Value         |
+| ---------- | ------------- |
+| Group      | `net.minestom` |
+| Artifact   | `minestom`    |
+| Repository | Maven Central |
+
+Find the latest version on the [GitHub releases page](https://github.com/minestom/minestom/releases).
+
+## Add the dependency
+
+<Tabs>
+  <Tab title="Gradle (Kotlin DSL)">
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("net.minestom:minestom:VERSION")
+}
+```
+
+Replace `VERSION` with the release version, for example `1.21.1-1.0.0`.
+
+  </Tab>
+  <Tab title="Gradle (Groovy DSL)">
+
+```groovy
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'net.minestom:minestom:VERSION'
+}
+```
+
+  </Tab>
+  <Tab title="Maven">
+
+```xml
+<dependency>
+    <groupId>net.minestom</groupId>
+    <artifactId>minestom</artifactId>
+    <version>VERSION</version>
+</dependency>
+```
+
+Maven Central is included in Maven's default repositories, so no additional `<repository>` entry is needed.
+
+  </Tab>
+</Tabs>
+
+## Java module system
+
+Minestom enables `modularity.inferModulePath = true` in its build, which means it is compatible with the Java Platform Module System (JPMS). If your project uses a `module-info.java`, add the following `requires` directive:
+
+```java
+module com.example.myserver {
+    requires net.minestom.server;
+}
+```
+
+<Note>
+  If you are not using JPMS (no `module-info.java`), no additional configuration is needed. The dependency works on the classpath as a regular JAR.
+</Note>
+
+## Building a fat JAR
+
+Minestom is a library — it does not include a launcher or main class. To produce a runnable JAR you need to shade (bundle) all dependencies together.
+
+<Tabs>
+  <Tab title="Gradle (Shadow plugin)">
+
+Add the Shadow plugin and configure the main class:
+
+```kotlin
+plugins {
+    id("com.gradleup.shadow") version "9.0.0"
+    application
+}
+
+application {
+    mainClass.set("com.example.myserver.Main")
+}
+
+tasks.shadowJar {
+    archiveClassifier.set("")
+}
+```
+
+Build the fat JAR:
+
+```bash
+./gradlew shadowJar
+```
+
+The output is in `build/libs/`. Run it with:
+
+```bash
+java -jar build/libs/myserver.jar
+```
+
+  </Tab>
+  <Tab title="Maven (Shade plugin)">
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <version>3.6.0</version>
+    <executions>
+        <execution>
+            <phase>package</phase>
+            <goals>
+                <goal>shade</goal>
+            </goals>
+            <configuration>
+                <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                        <mainClass>com.example.myserver.Main</mainClass>
+                    </transformer>
+                </transformers>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+Build and run:
+
+```bash
+mvn package
+java -jar target/myserver.jar
+```
+
+  </Tab>
+</Tabs>
+
+## Verify your setup
+
+Once the dependency resolves, confirm the setup compiles by calling `MinecraftServer.init()` in a main method:
+
+```java
+import net.minestom.server.MinecraftServer;
+import net.minestom.server.Auth;
+
+public class Main {
+    public static void main(String[] args) {
+        MinecraftServer server = MinecraftServer.init(new Auth.Offline());
+        server.start("0.0.0.0", 25565);
+    }
+}
+```
+
+If the build succeeds and the server starts without errors, your installation is correct.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Set up instances, events, and a working player spawn.
+  </Card>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Understand what Minestom is and when to use it.
+  </Card>
+</CardGroup>

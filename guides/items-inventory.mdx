@@ -1,0 +1,120 @@
+---
+title: "Items and inventories"
+description: "Create items with data components, manage player inventories, and open custom inventory windows."
+---
+
+## Creating items
+
+The simplest way to create an item is `ItemStack.of()`:
+
+```java
+ItemStack stone = ItemStack.of(Material.STONE);
+ItemStack diamond = ItemStack.of(Material.DIAMOND, 16); // stack of 16
+```
+
+Use `ItemStack.builder()` to attach data components:
+
+```java
+ItemStack sword = ItemStack.builder(Material.DIAMOND_SWORD)
+    .set(DataComponents.CUSTOM_NAME, Component.text("Excalibur").color(NamedTextColor.GOLD))
+    .set(DataComponents.UNBREAKABLE, Unit.INSTANCE)
+    .build();
+```
+
+## Data components
+
+Data components replace NBT tags for item metadata. Key components:
+
+| Component | Purpose |
+|---|---|
+| `DataComponents.CUSTOM_NAME` | Display name (`Component`) |
+| `DataComponents.LORE` | Tooltip lines (`List<Component>`) |
+| `DataComponents.ENCHANTMENTS` | Enchantments (`EnchantmentList`) |
+| `DataComponents.UNBREAKABLE` | Makes the item unbreakable (`Unit.INSTANCE`) |
+| `DataComponents.CUSTOM_MODEL_DATA` | Custom model data (`CustomModelData`) |
+| `DataComponents.CAN_PLACE_ON` | Block predicates for adventure mode |
+| `DataComponents.CAN_BREAK` | Block predicates for adventure mode |
+| `DataComponents.BUNDLE_CONTENTS` | Items inside a bundle |
+| `DataComponents.CHARGED_PROJECTILES` | Loaded crossbow projectiles |
+
+Reading a component:
+
+```java
+Component name = itemStack.get(DataComponents.CUSTOM_NAME);
+```
+
+Modifying an existing item (items are immutable — returns a new instance):
+
+```java
+ItemStack updated = itemStack.with(DataComponents.CUSTOM_NAME, Component.text("New Name"));
+```
+
+Remove a component:
+
+```java
+ItemStack clean = itemStack.without(DataComponents.CUSTOM_NAME);
+```
+
+## Player inventory
+
+Access a player's inventory with `player.getInventory()`:
+
+```java
+PlayerInventory inv = player.getInventory();
+
+// Add an item (returns false if full)
+boolean added = inv.addItemStack(ItemStack.of(Material.APPLE, 64));
+
+// Set a specific slot
+inv.setItemStack(0, ItemStack.of(Material.DIAMOND_SWORD));
+
+// Get item in a slot
+ItemStack hotbarSlot0 = inv.getItemStack(0);
+
+// Clear all items
+inv.clear();
+```
+
+From the demo's `PlayerSpawnEvent`:
+
+```java
+ItemStack item = ItemStack.builder(Material.STONE)
+    .amount(64)
+    .set(DataComponents.CAN_PLACE_ON, new BlockPredicates(new BlockPredicate(Block.STONE)))
+    .set(DataComponents.CAN_BREAK,    new BlockPredicates(new BlockPredicate(Block.DIAMOND_ORE)))
+    .build();
+player.getInventory().addItemStack(item);
+```
+
+## Custom inventories
+
+Create an `Inventory` with a type and title, then open it for a player:
+
+```java
+Inventory chest = new Inventory(InventoryType.CHEST_3_ROW, Component.text("My Chest"));
+chest.setItemStack(0, ItemStack.of(Material.DIAMOND, 5));
+
+player.openInventory(chest);
+```
+
+Close the current inventory:
+
+```java
+player.closeInventory();
+```
+
+## Inventory click events
+
+Listen to clicks inside an inventory with `InventoryPreClickEvent` or `InventoryClickEvent`:
+
+```java
+MinecraftServer.getGlobalEventHandler().addListener(InventoryPreClickEvent.class, event -> {
+    if (event.getInventory() == chest) {
+        event.setCancelled(true); // read-only inventory
+    }
+});
+```
+
+## Available inventory types
+
+Common `InventoryType` values: `CHEST_1_ROW` through `CHEST_6_ROW`, `CRAFTING`, `ANVIL`, `FURNACE`, `HOPPER`, `DROPPER`, `DISPENSER`, `ENCHANTMENT`, `BREWING_STAND`.
